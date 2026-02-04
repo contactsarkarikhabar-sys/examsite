@@ -45,4 +45,4 @@ export interface JobDetailData {
   videoLink?: string; // YouTube Video ID or URL
 }
 
-export type ViewType = 'home' | 'detail' | 'category' | 'about' | 'contact' | 'privacy' | 'terms' | 'disclaimer';
+export type ViewType = 'home' | 'detail' | 'category' | 'about' | 'contact' | 'privacy' | 'terms' | 'disclaimer' | 'admin';

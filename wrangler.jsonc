@@ -1,7 +1,24 @@
 {
     "name": "examsite",
+    "main": "src/worker.ts",
     "compatibility_date": "2026-02-04",
+    "compatibility_flags": [
+        "nodejs_compat"
+    ],
     "assets": {
         "directory": "./dist"
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "examsite-db",
+            "database_id": "YOUR_D1_DATABASE_ID"
+        }
+    ],
+    "vars": {
+        "SITE_URL": "https://examsite.in"
     }
+    // Secrets (set via wrangler secret put):
+    // - RESEND_API_KEY
+    // - ADMIN_PASSWORD
 }

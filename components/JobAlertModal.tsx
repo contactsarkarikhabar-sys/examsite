@@ -14,7 +14,7 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { language } = useLanguage();
   const t = translations[language];
-  
+
   // Form State
   const [formData, setFormData] = useState({
     name: '',
@@ -39,18 +39,21 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
-      // Use the service to simulate a real backend call
-      await jobService.subscribeUser(formData);
-      setSubmitted(true);
-      
-      // Auto close after showing success
-      setTimeout(() => {
-        onClose();
-        setSubmitted(false);
-        setFormData({ name: '', email: '', qualification: '10th Pass', location: 'All India', interests: [] });
-      }, 3000);
+      // Call the backend API to subscribe user
+      const result = await jobService.subscribeUser(formData);
+
+      if (result.success) {
+        setSubmitted(true);
+
+        // Auto close after showing success
+        setTimeout(() => {
+          onClose();
+          setSubmitted(false);
+          setFormData({ name: '', email: '', qualification: '10th Pass', location: 'All India', interests: [] });
+        }, 4000);
+      }
     } catch (error) {
       console.error("Subscription failed", error);
     } finally {
@@ -61,7 +64,7 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
-        
+
         {/* Header */}
         <div className="bg-gradient-to-r from-red-700 to-red-800 p-5 text-white flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -80,16 +83,16 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <p className="text-gray-600 text-sm mb-4">
                 {t.alertDesc}
               </p>
-              
+
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.fullName}</label>
-                <input 
-                    required 
-                    type="text" 
-                    value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition" 
-                    placeholder={t.enterName}
+                <input
+                  required
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition"
+                  placeholder={t.enterName}
                 />
               </div>
 
@@ -97,13 +100,13 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.emailAddress}</label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-3 text-gray-400" />
-                  <input 
-                    required 
-                    type="email" 
+                  <input
+                    required
+                    type="email"
                     value={formData.email}
-                    onChange={e => setFormData({...formData, email: e.target.value})}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 pl-10 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition" 
-                    placeholder="you@example.com" 
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 pl-10 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition"
+                    placeholder="you@example.com"
                   />
                 </div>
               </div>
@@ -111,9 +114,9 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.qualification}</label>
-                  <select 
+                  <select
                     value={formData.qualification}
-                    onChange={e => setFormData({...formData, qualification: e.target.value})}
+                    onChange={e => setFormData({ ...formData, qualification: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-500 outline-none bg-white"
                   >
                     <option>10th Pass</option>
@@ -124,41 +127,41 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.location}</label>
-                    <select 
-                        value={formData.location}
-                        onChange={e => setFormData({...formData, location: e.target.value})}
-                        className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-500 outline-none bg-white"
-                    >
-                        <option>All India</option>
-                        <option>Uttar Pradesh</option>
-                        <option>Bihar</option>
-                        <option>Delhi</option>
-                        <option>Rajasthan</option>
-                        <option>Madhya Pradesh</option>
-                    </select>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.location}</label>
+                  <select
+                    value={formData.location}
+                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-500 outline-none bg-white"
+                  >
+                    <option>All India</option>
+                    <option>Uttar Pradesh</option>
+                    <option>Bihar</option>
+                    <option>Delhi</option>
+                    <option>Rajasthan</option>
+                    <option>Madhya Pradesh</option>
+                  </select>
                 </div>
               </div>
 
               <div>
-                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.interests}</label>
-                 <div className="flex flex-wrap gap-2">
-                    {['SSC', 'Railway', 'Banking', 'Police', 'Teaching', 'Defence'].map(tag => (
-                        <label key={tag} className="flex items-center space-x-1 bg-gray-100 px-3 py-1 rounded-full text-xs cursor-pointer hover:bg-gray-200">
-                            <input 
-                                type="checkbox" 
-                                className="accent-red-600 rounded" 
-                                checked={formData.interests.includes(tag)}
-                                onChange={() => handleInterestChange(tag)}
-                            />
-                            <span>{tag}</span>
-                        </label>
-                    ))}
-                 </div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{t.interests}</label>
+                <div className="flex flex-wrap gap-2">
+                  {['SSC', 'Railway', 'Banking', 'Police', 'Teaching', 'Defence'].map(tag => (
+                    <label key={tag} className="flex items-center space-x-1 bg-gray-100 px-3 py-1 rounded-full text-xs cursor-pointer hover:bg-gray-200">
+                      <input
+                        type="checkbox"
+                        className="accent-red-600 rounded"
+                        checked={formData.interests.includes(tag)}
+                        onChange={() => handleInterestChange(tag)}
+                      />
+                      <span>{tag}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isSubmitting}
                 className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg shadow-lg transform hover:-translate-y-0.5 transition-all mt-2 flex justify-center items-center disabled:opacity-70 disabled:cursor-not-allowed"
               >
@@ -167,13 +170,16 @@ const JobAlertModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </form>
           ) : (
             <div className="text-center py-8">
-               <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                 <CheckCircle size={32} className="text-green-600" />
-               </div>
-               <h3 className="text-xl font-bold text-gray-800 mb-2">{t.subscribed}</h3>
-               <p className="text-gray-600 text-sm">
-                 {t.subscribedDesc}
-               </p>
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle size={32} className="text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">{t.subscribed}</h3>
+              <p className="text-gray-600 text-sm">
+                {t.subscribedDesc}
+              </p>
+              <p className="text-red-600 text-sm mt-3 font-medium">
+                📧 कृपया अपना email verify करने के लिए inbox check करें!
+              </p>
             </div>
           )}
         </div>
