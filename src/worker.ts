@@ -12,6 +12,7 @@ interface Env {
     RESEND_API_KEY: string;
     ADMIN_PASSWORD: string;
     SITE_URL: string;
+    ASSETS?: { fetch: (request: Request) => Promise<Response> };
 }
 
 interface Subscriber {
@@ -522,7 +523,8 @@ export default {
             return errorResponse('Not found', 404, origin);
         }
 
-        // For non-API routes, let Cloudflare serve static assets
-        return new Response('Not found', { status: 404 });
+        // For non-API routes, return undefined to let Cloudflare serve static assets
+        // In Workers with assets, returning a fetch to origin serves the static content
+        return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 });
     },
 };
