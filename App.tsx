@@ -266,11 +266,30 @@ const App: React.FC = () => {
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
         } else {
-            // Show instructions for iOS or already installed
+            // Detect device and show appropriate instructions
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            const msg = isIOS
-                ? (language === 'hi' ? 'Safari में Share बटन (⬆️) दबाएं → "Add to Home Screen" चुनें' : 'Tap Share (⬆️) in Safari → Select "Add to Home Screen"')
-                : (language === 'hi' ? 'ऐप इंस्टॉल करने के लिए: Menu (⋮) → "Install App" या "Add to Home Screen"' : 'To install: Menu (⋮) → "Install App" or "Add to Home Screen"');
+            const isAndroid = /Android/.test(navigator.userAgent);
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+            if (isStandalone) {
+                alert(language === 'hi' ? '✅ ऐप पहले से इंस्टॉल है!' : '✅ App is already installed!');
+                return;
+            }
+
+            let msg = '';
+            if (isIOS) {
+                msg = language === 'hi'
+                    ? '📱 iOS पर इंस्टॉल करें:\n\n1. Safari में यह पेज खोलें\n2. Share बटन (⬆️) पर टैप करें\n3. "Add to Home Screen" चुनें\n4. "Add" पर टैप करें'
+                    : '📱 Install on iOS:\n\n1. Open this page in Safari\n2. Tap the Share button (⬆️)\n3. Select "Add to Home Screen"\n4. Tap "Add"';
+            } else if (isAndroid) {
+                msg = language === 'hi'
+                    ? '📱 Android पर इंस्टॉल करें:\n\n1. Chrome में यह पेज खोलें\n2. Menu (⋮) पर टैप करें\n3. "Install App" या "Add to Home screen" चुनें\n4. "Install" पर टैप करें'
+                    : '📱 Install on Android:\n\n1. Open this page in Chrome\n2. Tap the Menu (⋮)\n3. Select "Install App" or "Add to Home screen"\n4. Tap "Install"';
+            } else {
+                msg = language === 'hi'
+                    ? '💻 Desktop पर इंस्टॉल करें:\n\n1. Chrome/Edge में यह पेज खोलें\n2. Address bar में Install icon (⊕) पर क्लिक करें\n   या Menu → "Install ExamSite..."\n3. "Install" पर क्लिक करें'
+                    : '💻 Install on Desktop:\n\n1. Open this page in Chrome/Edge\n2. Click Install icon (⊕) in address bar\n   or Menu → "Install ExamSite..."\n3. Click "Install"';
+            }
             alert(msg);
         }
     };
