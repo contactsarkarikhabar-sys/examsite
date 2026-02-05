@@ -712,8 +712,24 @@ export default {
             return errorResponse('Not found', 404, origin);
         }
 
-        // For non-API routes, return undefined to let Cloudflare serve static assets
-        // In Workers with assets, returning a fetch to origin serves the static content
-        return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 });
+        // For non-API routes, handle SPA routing:
+        // 1. Try to serve the requested asset
+        // 2. If not found (404) and it's not a file request (no extension), serve index.html
+        if (env.ASSETS) {
+            const response = await env.ASSETS.fetch(request);
+
+            if (response.status === 404) {
+                // simple heuristic: if the path header doesn't have a file extension, it's likely a route
+                // Exceptions: / (handled by index.html automatically usually, but good to be safe)
+                const isFile = path.split('/').pop()?.includes('.');
+                if (!isFile) {
+                    return env.ASSETS.fetch(new Request(new URL('/index.html', request.url), request));
+                }
+            }
+
+            return response;
+        }
+
+        return new Response('Not found', { status: 404 });
     },
 };
