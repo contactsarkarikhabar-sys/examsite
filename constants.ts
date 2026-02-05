@@ -1,6 +1,7 @@
 import { SectionData, JobDetailData } from './types';
 
 export const MARQUEE_TEXTS = [
+  "SSC Phase 13 Result 2025 Declared",
   "UPPSC Mains 2024 Result Declared",
   "UPSC Civil Services 2026 Online Form",
   "NTA UGC NET Dec 2025 Result Declared",
@@ -14,9 +15,10 @@ export const MARQUEE_TEXTS = [
 
 export const MOCK_SECTIONS: SectionData[] = [
   {
-    title: "New Updates",
+    title: "New Updates", 
     color: "red",
     items: [
+      { id: "ssc-phase-13-res", title: "SSC Selection Post Phase 13 Result 2025", isNew: true, link: "#" },
       { id: "uppsc-mains-2024-res", title: "UPPSC Mains 2024 Result Declared", isNew: true, link: "#" },
       { id: "ugc-net-dec-res", title: "NTA UGC NET December 2025 Final Answer Key / Result", isNew: true, link: "#" },
       { id: "pm-kisan-19", title: "PM Kisan Samman Nidhi 19th Installment Status Check", isNew: true, link: "#" },
@@ -65,6 +67,7 @@ export const MOCK_SECTIONS: SectionData[] = [
     title: "Results",
     color: "orange",
     items: [
+      { id: "ssc-phase-13-res", title: "SSC Selection Post Phase 13 Result 2025", isNew: true, link: "#" },
       { id: "uppsc-mains-2024-res", title: "UPPSC Mains 2024 Result Declared", isNew: true, link: "#" },
       { id: "ugc-net-res", title: "NTA UGC NET December 2025 Final Answer Key / Result", isNew: true, link: "#" },
       { id: "lic-aao-res", title: "LIC AAO (Generalist) Mains Result 2026", isNew: true, link: "#" },
@@ -159,6 +162,26 @@ export const MOCK_SECTIONS: SectionData[] = [
 
 export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
   // --- RESULTS ---
+  "ssc-phase-13-res": {
+    id: "ssc-phase-13-res",
+    title: "SSC Selection Post Phase 13 Result 2025",
+    postDate: "Updated: Today",
+    shortInfo: "Staff Selection Commission (SSC) has declared the result for Selection Post Phase XIII (13) Examination 2025. Candidates who appeared for the Computer Based Examination (CBT) can now check their results, cutoff marks, and merit list. The result is available for Matriculation, Higher Secondary (10+2), and Graduate Level posts.",
+    importantDates: ["Exam Date: August 2025", "Result Declared: Today"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "Matriculation Level", totalPost: "Various", eligibility: "Class 10th High School Exam Passed" },
+        { postName: "Higher Secondary (10+2) Level", totalPost: "Various", eligibility: "10+2 Intermediate Exam Passed" },
+        { postName: "Graduate & Above Level", totalPost: "Various", eligibility: "Bachelor Degree in Any Stream" }
+    ],
+    importantLinks: [
+        { label: "Download Result (Matric)", url: "https://ssc.gov.in/" },
+        { label: "Download Result (Inter)", url: "https://ssc.gov.in/" },
+        { label: "Download Result (Graduate)", url: "https://ssc.gov.in/" },
+        { label: "Official Website", url: "https://ssc.gov.in/" }
+    ]
+  },
   "uppsc-mains-2024-res": {
     id: "uppsc-mains-2024-res",
     title: "UPPSC Mains 2024 Result Declared",
@@ -168,11 +191,11 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "UPPSC Pre 2024", totalPost: "220", eligibility: "Mains Qualified Candidates" }
+        { postName: "UPPSC Pre 2024", totalPost: "220", eligibility: "Mains Qualified Candidates" }
     ],
     importantLinks: [
-      { label: "Download Result", url: "https://uppsc.up.nic.in/Open_PDF.aspx?I4PnQ0tBagke7gAj%2Fgiopt4x4lu4nlW0" },
-      { label: "Official Website", url: "https://uppsc.up.nic.in/" }
+        { label: "Download Result", url: "https://uppsc.up.nic.in/Open_PDF.aspx?I4PnQ0tBagke7gAj%2Fgiopt4x4lu4nlW0" },
+        { label: "Official Website", url: "https://uppsc.up.nic.in/" }
     ]
   },
 
@@ -183,41 +206,41 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     postDate: "10 January 2026 | 11:30 AM",
     shortInfo: "Staff Selection Commission (SSC) has released the tentative examination calendar for the year 2026-27. According to this calendar, the notification for the Combined Graduate Level (CGL) Examination 2026 is expected to be released in April 2026. This is one of the most prestigious examinations in India for graduates, offering recruitment to Group 'B' and Group 'C' posts in various Ministries, Departments, and Organizations of the Government of India. Posts include Assistant Section Officer (ASO) in CSS/MEA/Railway, Inspector of Income Tax, Inspector (Central Excise), Assistant Enforcement Officer, Sub Inspector in CBI, and many more. Candidates who have completed their Bachelor's Degree in any stream from a recognized university are eligible to apply. The selection process will consist of Tier-I and Tier-II computer-based examinations. Aspirants are advised to start their preparation early and keep an eye on the official website for the detailed notification.",
     importantDates: [
-      "Application Begin: 01/04/2026 (Tentative)",
-      "Last Date for Apply Online: 01/05/2026",
-      "Last Date Pay Exam Fee: 02/05/2026",
-      "Correction Date: 05-06 May 2026",
-      "Tier I Exam Date: June / July 2026",
-      "Tier I Admit Card Available: Before Exam",
-      "Tier II Exam Date: Notified Soon"
+        "Application Begin: 01/04/2026 (Tentative)",
+        "Last Date for Apply Online: 01/05/2026",
+        "Last Date Pay Exam Fee: 02/05/2026",
+        "Correction Date: 05-06 May 2026",
+        "Tier I Exam Date: June / July 2026",
+        "Tier I Admit Card Available: Before Exam",
+        "Tier II Exam Date: Notified Soon"
     ],
     applicationFee: [
-      "General / OBC / EWS: ₹ 100/-",
-      "SC / ST / PH: ₹ 0/-",
-      "All Category Female: ₹ 0/-",
-      "Correction Charge (1st Time): ₹ 200/-",
-      "Correction Charge (2nd Time): ₹ 500/-",
-      "Payment Mode: Pay the exam fee through Debit Card, Credit Card, Net Banking, or UPI only."
+        "General / OBC / EWS: ₹ 100/-",
+        "SC / ST / PH: ₹ 0/-",
+        "All Category Female: ₹ 0/-",
+        "Correction Charge (1st Time): ₹ 200/-",
+        "Correction Charge (2nd Time): ₹ 500/-",
+        "Payment Mode: Pay the exam fee through Debit Card, Credit Card, Net Banking, or UPI only."
     ],
     ageLimit: [
-      "Minimum Age: 18 Years",
-      "Maximum Age: 27-32 Years (Post Wise)",
-      "Age Relaxation: As per SSC CGL 2026 Recruitment Rules (OBC: 3 Years, SC/ST: 5 Years, PH: 10 Years)"
+        "Minimum Age: 18 Years",
+        "Maximum Age: 27-32 Years (Post Wise)",
+        "Age Relaxation: As per SSC CGL 2026 Recruitment Rules (OBC: 3 Years, SC/ST: 5 Years, PH: 10 Years)"
     ],
     vacancyDetails: [
-      { postName: "Assistant Audit Officer (AAO)", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream. Desirable: CA/CS/MBA/Cost & Management Accountant." },
-      { postName: "Junior Statistical Officer (JSO)", totalPost: "TBA", eligibility: "Bachelor Degree with 60% Marks in Math at 12th Level OR Bachelor Degree with Statistics as one of the subjects." },
-      { postName: "Inspector (Central Excise / Preventive Officer / Examiner)", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream from a Recognized University." },
-      { postName: "Sub Inspector (CBI)", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream." },
-      { postName: "Auditor / Accountant / UDC / Tax Assistant", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream." }
+        { postName: "Assistant Audit Officer (AAO)", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream. Desirable: CA/CS/MBA/Cost & Management Accountant." },
+        { postName: "Junior Statistical Officer (JSO)", totalPost: "TBA", eligibility: "Bachelor Degree with 60% Marks in Math at 12th Level OR Bachelor Degree with Statistics as one of the subjects." },
+        { postName: "Inspector (Central Excise / Preventive Officer / Examiner)", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream from a Recognized University." },
+        { postName: "Sub Inspector (CBI)", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream." },
+        { postName: "Auditor / Accountant / UDC / Tax Assistant", totalPost: "TBA", eligibility: "Bachelor Degree in Any Stream." }
     ],
     importantLinks: [
-      { label: "Apply Online (Link Activate 01/04/2026)", url: "https://ssc.gov.in/" },
-      { label: "Download Exam Calendar", url: "https://ssc.gov.in/" },
-      { label: "Official Website", url: "https://ssc.gov.in/" }
+        { label: "Apply Online (Link Activate 01/04/2026)", url: "https://ssc.gov.in/" },
+        { label: "Download Exam Calendar", url: "https://ssc.gov.in/" },
+        { label: "Official Website", url: "https://ssc.gov.in/" }
     ]
   },
-
+  
   // --- SYLLABUS DETAILS ---
   "ssc-cgl-syll": {
     id: "ssc-cgl-syll",
@@ -228,12 +251,12 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Tier-I Exam", totalPost: "200 Marks", eligibility: "General Intelligence (25), Awareness (25), Quant (25), English (25) - 60 Minutes" },
-      { postName: "Tier-II Paper I", totalPost: "450 Marks", eligibility: "Section I (Maths+Reasoning), Section II (English+GA), Section III (Computer)" }
+        { postName: "Tier-I Exam", totalPost: "200 Marks", eligibility: "General Intelligence (25), Awareness (25), Quant (25), English (25) - 60 Minutes" },
+        { postName: "Tier-II Paper I", totalPost: "450 Marks", eligibility: "Section I (Maths+Reasoning), Section II (English+GA), Section III (Computer)" }
     ],
     importantLinks: [
-      { label: "Download Syllabus PDF", url: "https://ssc.gov.in/" },
-      { label: "Official Website", url: "https://ssc.gov.in/" }
+        { label: "Download Syllabus PDF", url: "https://ssc.gov.in/" },
+        { label: "Official Website", url: "https://ssc.gov.in/" }
     ]
   },
   "upsc-ias-syll": {
@@ -245,12 +268,12 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Prelims GS Paper I", totalPost: "200 Marks", eligibility: "History, Geography, Polity, Economy, Environment, Science, Current Affairs." },
-      { postName: "Prelims CSAT Paper II", totalPost: "200 Marks", eligibility: "Comprehension, Logical Reasoning, Basic Numeracy (Class X level). Qualifying (33%)." }
+        { postName: "Prelims GS Paper I", totalPost: "200 Marks", eligibility: "History, Geography, Polity, Economy, Environment, Science, Current Affairs." },
+        { postName: "Prelims CSAT Paper II", totalPost: "200 Marks", eligibility: "Comprehension, Logical Reasoning, Basic Numeracy (Class X level). Qualifying (33%)." }
     ],
     importantLinks: [
-      { label: "Download Syllabus PDF", url: "https://upsc.gov.in/" },
-      { label: "Official Website", url: "https://upsc.gov.in/" }
+        { label: "Download Syllabus PDF", url: "https://upsc.gov.in/" },
+        { label: "Official Website", url: "https://upsc.gov.in/" }
     ]
   },
   "up-police-syll": {
@@ -262,12 +285,12 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Written Exam", totalPost: "300 Marks", eligibility: "150 Questions, 2 Marks each. 0.5 Negative Marking." },
-      { postName: "Subjects", totalPost: "4 Sections", eligibility: "GK, Hindi, Maths, Reasoning" }
+        { postName: "Written Exam", totalPost: "300 Marks", eligibility: "150 Questions, 2 Marks each. 0.5 Negative Marking." },
+        { postName: "Subjects", totalPost: "4 Sections", eligibility: "GK, Hindi, Maths, Reasoning" }
     ],
     importantLinks: [
-      { label: "Download Syllabus PDF", url: "https://uppbpb.gov.in/" },
-      { label: "Official Website", url: "https://uppbpb.gov.in/" }
+        { label: "Download Syllabus PDF", url: "https://uppbpb.gov.in/" },
+        { label: "Official Website", url: "https://uppbpb.gov.in/" }
     ]
   },
   "rrb-ntpc-syll": {
@@ -279,11 +302,11 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "CBT 1", totalPost: "100 Marks", eligibility: "General Awareness (40), Maths (30), Reasoning (30). 90 Mins." },
-      { postName: "CBT 2", totalPost: "120 Marks", eligibility: "General Awareness (50), Maths (35), Reasoning (35). 90 Mins." }
+        { postName: "CBT 1", totalPost: "100 Marks", eligibility: "General Awareness (40), Maths (30), Reasoning (30). 90 Mins." },
+        { postName: "CBT 2", totalPost: "120 Marks", eligibility: "General Awareness (50), Maths (35), Reasoning (35). 90 Mins." }
     ],
     importantLinks: [
-      { label: "Download Syllabus", url: "https://indianrailways.gov.in/" }
+        { label: "Download Syllabus", url: "https://indianrailways.gov.in/" }
     ]
   },
   "neet-ug-syll": {
@@ -295,12 +318,12 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Physics", totalPost: "45 Qs", eligibility: "Mechanics, Optics, Thermodynamics, Electrodynamics etc." },
-      { postName: "Chemistry", totalPost: "45 Qs", eligibility: "Physical, Organic, Inorganic Chemistry." },
-      { postName: "Biology", totalPost: "90 Qs", eligibility: "Diversity, Structural Org, Cell, Physiology, Genetics, Ecology." }
+        { postName: "Physics", totalPost: "45 Qs", eligibility: "Mechanics, Optics, Thermodynamics, Electrodynamics etc." },
+        { postName: "Chemistry", totalPost: "45 Qs", eligibility: "Physical, Organic, Inorganic Chemistry." },
+        { postName: "Biology", totalPost: "90 Qs", eligibility: "Diversity, Structural Org, Cell, Physiology, Genetics, Ecology." }
     ],
     importantLinks: [
-      { label: "Download Syllabus", url: "https://exams.nta.ac.in/NEET/" }
+        { label: "Download Syllabus", url: "https://exams.nta.ac.in/NEET/" }
     ]
   },
   "ctet-syll": {
@@ -312,11 +335,11 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Paper I", totalPost: "150 Marks", eligibility: "CDP, Language I, Language II, Maths, EVS." },
-      { postName: "Paper II", totalPost: "150 Marks", eligibility: "CDP, Language I, Language II, Maths & Science OR Social Studies." }
+        { postName: "Paper I", totalPost: "150 Marks", eligibility: "CDP, Language I, Language II, Maths, EVS." },
+        { postName: "Paper II", totalPost: "150 Marks", eligibility: "CDP, Language I, Language II, Maths & Science OR Social Studies." }
     ],
     importantLinks: [
-      { label: "Download Syllabus", url: "https://ctet.nic.in/" }
+        { label: "Download Syllabus", url: "https://ctet.nic.in/" }
     ]
   },
   "bpsc-syll": {
@@ -328,10 +351,10 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Prelims", totalPost: "150 Marks", eligibility: "General Studies, Bihar GK, Current Affairs, Science, History, Geography, Polity." }
+        { postName: "Prelims", totalPost: "150 Marks", eligibility: "General Studies, Bihar GK, Current Affairs, Science, History, Geography, Polity." }
     ],
     importantLinks: [
-      { label: "Official Website", url: "https://www.bpsc.bih.nic.in/" }
+        { label: "Official Website", url: "https://www.bpsc.bih.nic.in/" }
     ]
   },
   "agniveer-syll": {
@@ -343,16 +366,16 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     applicationFee: ["NA"],
     ageLimit: ["NA"],
     vacancyDetails: [
-      { postName: "Agniveer GD", totalPost: "100 Marks", eligibility: "GK (15 Qs), Science (15 Qs), Maths (15 Qs), Reasoning (5 Qs)." }
+        { postName: "Agniveer GD", totalPost: "100 Marks", eligibility: "GK (15 Qs), Science (15 Qs), Maths (15 Qs), Reasoning (5 Qs)." }
     ],
     importantLinks: [
-      { label: "Join Indian Army", url: "https://joinindianarmy.nic.in/" }
+        { label: "Join Indian Army", url: "https://joinindianarmy.nic.in/" }
     ]
   },
 
 
   // --- SCHEMES & DOCUMENTS ---
-
+  
   "pm-kisan-19": {
     id: "pm-kisan-19",
     title: "PM Kisan Samman Nidhi Yojana 19th Installment",
@@ -363,9 +386,9 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     ageLimit: ["Minimum Age: 18 Years", "Must be a land-holding farmer family."],
     vacancyDetails: [{ postName: "PM Kisan Beneficiary", totalPost: "All Eligible Farmers", eligibility: "Small and Marginal Farmers with cultivable landholding." }],
     importantLinks: [
-      { label: "Check Beneficiary Status", url: "https://pmkisan.gov.in/" },
-      { label: "e-KYC Online", url: "https://pmkisan.gov.in/" },
-      { label: "New Farmer Registration", url: "https://pmkisan.gov.in/" }
+        { label: "Check Beneficiary Status", url: "https://pmkisan.gov.in/" },
+        { label: "e-KYC Online", url: "https://pmkisan.gov.in/" },
+        { label: "New Farmer Registration", url: "https://pmkisan.gov.in/" }
     ]
   },
   "ayushman-card": {
@@ -378,9 +401,9 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     ageLimit: ["No Age Limit", "Eligibility based on SECC 2011 Data"],
     vacancyDetails: [{ postName: "Ayushman Card Holder", totalPost: "50 Crore+ Beneficiaries", eligibility: "Families identified in SECC 2011 database or having Antyodaya Ration Card." }],
     importantLinks: [
-      { label: "Download Ayushman Card", url: "https://beneficiary.nha.gov.in/" },
-      { label: "Apply Online / KYC", url: "https://beneficiary.nha.gov.in/" },
-      { label: "Official Website", url: "https://pmjay.gov.in/" }
+        { label: "Download Ayushman Card", url: "https://beneficiary.nha.gov.in/" },
+        { label: "Apply Online / KYC", url: "https://beneficiary.nha.gov.in/" },
+        { label: "Official Website", url: "https://pmjay.gov.in/" }
     ]
   },
   "e-shram": {
@@ -451,7 +474,7 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
   },
 
   // --- CERTIFICATES ---
-
+  
   "aadhar-card": {
     id: "aadhar-card",
     title: "Aadhar Card Services: Download, Update, Status",
@@ -462,9 +485,9 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     ageLimit: ["No Age Limit. Even newborns can get Baal Aadhaar (Blue color)."],
     vacancyDetails: [{ postName: "Aadhaar Card", totalPost: "NA", eligibility: "Resident of India" }],
     importantLinks: [
-      { label: "Download E-Aadhaar", url: "https://myaadhaar.uidai.gov.in/" },
-      { label: "Check Update Status", url: "https://myaadhaar.uidai.gov.in/" },
-      { label: "Book Appointment", url: "https://appointments.uidai.gov.in/bookappointment.aspx" }
+        { label: "Download E-Aadhaar", url: "https://myaadhaar.uidai.gov.in/" },
+        { label: "Check Update Status", url: "https://myaadhaar.uidai.gov.in/" },
+        { label: "Book Appointment", url: "https://appointments.uidai.gov.in/bookappointment.aspx" }
     ]
   },
   "pan-card": {
@@ -477,9 +500,9 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     ageLimit: ["Min Age: 18 Years for Independent Application", "Minors can apply through Representative Assessee (Parents)."],
     vacancyDetails: [{ postName: "PAN Card", totalPost: "NA", eligibility: "Indian Citizen / Foreign Citizen / Company / Firm" }],
     importantLinks: [
-      { label: "Apply Online (NSDL)", url: "https://www.onlineservices.nsdl.com/paam/endUserRegisterContact.html" },
-      { label: "Apply Online (UTI)", url: "https://www.pan.utiitsl.com/PAN/" },
-      { label: "Link PAN with Aadhaar", url: "https://eportal.incometax.gov.in/iec/foservices/#/pre-login/bl-link-aadhaar" }
+        { label: "Apply Online (NSDL)", url: "https://www.onlineservices.nsdl.com/paam/endUserRegisterContact.html" },
+        { label: "Apply Online (UTI)", url: "https://www.pan.utiitsl.com/PAN/" },
+        { label: "Link PAN with Aadhaar", url: "https://eportal.incometax.gov.in/iec/foservices/#/pre-login/bl-link-aadhaar" }
     ]
   },
   "voter-id": {
@@ -550,41 +573,41 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
   },
 
   // --- OTHER JOBS ---
-
+  
   "upsc-2026": {
     id: "upsc-2026",
     title: "UPSC Civil Services IAS / IFS Pre 2026 Online Form",
     postDate: "14 February 2026 | 02:00 PM",
     shortInfo: "Union Public Service Commission (UPSC) has issued the notification for the Civil Services Examination (CSE) 2026 and Indian Forest Service (IFS) Examination 2026. This exam is conducted to recruit officers for the Indian Administrative Service (IAS), Indian Foreign Service (IFS), Indian Police Service (IPS), and other Central Services (Group A and Group B). It is considered the toughest and most prestigious exam in the country. Candidates must hold a Graduate degree to apply. The examination consists of three stages: Preliminary, Mains, and Interview. Interested candidates who meet the eligibility criteria can apply online through the OTR (One Time Registration) system on the UPSC website.",
     importantDates: [
-      "Application Begin: 14/02/2026",
-      "Last Date for Apply Online: 05/03/2026 (upto 6 PM)",
-      "Pay Exam Fee Last Date: 05/03/2026",
-      "Correction / Edit Form: 06-12 March 2026",
-      "Pre Exam Date: 26/05/2026",
-      "Admit Card Available: May 2026"
+        "Application Begin: 14/02/2026",
+        "Last Date for Apply Online: 05/03/2026 (upto 6 PM)",
+        "Pay Exam Fee Last Date: 05/03/2026",
+        "Correction / Edit Form: 06-12 March 2026",
+        "Pre Exam Date: 26/05/2026",
+        "Admit Card Available: May 2026"
     ],
     applicationFee: [
-      "General / OBC / EWS: ₹ 100/-",
-      "SC / ST / PH: ₹ 0/-",
-      "All Category Female: ₹ 0/-",
-      "Payment Mode: Pay the examination fee through Debit Card, Credit Card, Net Banking, or UPI."
+        "General / OBC / EWS: ₹ 100/-",
+        "SC / ST / PH: ₹ 0/-",
+        "All Category Female: ₹ 0/-",
+        "Payment Mode: Pay the examination fee through Debit Card, Credit Card, Net Banking, or UPI."
     ],
     ageLimit: [
-      "Minimum Age: 21 Years",
-      "Maximum Age: 32 Years",
-      "Age Calculate on: 01/08/2026",
-      "Age Relaxation: SC/ST: 5 Years, OBC: 3 Years, PH: 10 Years (As per rules)"
+        "Minimum Age: 21 Years",
+        "Maximum Age: 32 Years",
+        "Age Calculate on: 01/08/2026",
+        "Age Relaxation: SC/ST: 5 Years, OBC: 3 Years, PH: 10 Years (As per rules)"
     ],
     vacancyDetails: [
-      { postName: "Indian Administrative Service (IAS)", totalPost: "1056", eligibility: "Bachelor Degree in Any Stream from Any Recognized University in India." },
-      { postName: "Indian Forest Service (IFS)", totalPost: "150", eligibility: "Bachelor Degree with at least one of the subjects namely Animal Husbandry & Veterinary Science, Botany, Chemistry, Geology, Mathematics, Physics, Statistics and Zoology or a Bachelor's degree in Agriculture, Forestry or in Engineering." }
+        { postName: "Indian Administrative Service (IAS)", totalPost: "1056", eligibility: "Bachelor Degree in Any Stream from Any Recognized University in India." },
+        { postName: "Indian Forest Service (IFS)", totalPost: "150", eligibility: "Bachelor Degree with at least one of the subjects namely Animal Husbandry & Veterinary Science, Botany, Chemistry, Geology, Mathematics, Physics, Statistics and Zoology or a Bachelor's degree in Agriculture, Forestry or in Engineering." }
     ],
     importantLinks: [
-      { label: "Apply Online", url: "https://upsconline.nic.in/" },
-      { label: "Download Notification (IAS)", url: "https://upsc.gov.in/" },
-      { label: "Download Notification (IFS)", url: "https://upsc.gov.in/" },
-      { label: "Official Website", url: "https://upsc.gov.in/" }
+        { label: "Apply Online", url: "https://upsconline.nic.in/" },
+        { label: "Download Notification (IAS)", url: "https://upsc.gov.in/" },
+        { label: "Download Notification (IFS)", url: "https://upsc.gov.in/" },
+        { label: "Official Website", url: "https://upsc.gov.in/" }
     ]
   },
   "airforce-2027": {
@@ -593,29 +616,29 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     postDate: "01 February 2026",
     shortInfo: "Indian Air Force (IAF) invites online applications from unmarried Indian male and female candidates for selection test for Agniveer Vayu Intake 01/2027 under the Agnipath Scheme. This is a golden opportunity to serve the nation. The selection process involves an online test, physical fitness test (PFT), adaptability test, and medical examination. Selected candidates will be enrolled for a period of 4 years. Upon completion of 4 years, 25% of Agniveers will be enrolled in the regular cadre of the Indian Air Force based on merit and organizational requirements.",
     importantDates: [
-      "Application Begin: 17/02/2026",
-      "Last Date for Apply Online: 10/03/2026",
-      "Exam Date: 20/05/2026 onwards",
-      "Admit Card Available: 48 Hours before Exam"
+        "Application Begin: 17/02/2026",
+        "Last Date for Apply Online: 10/03/2026",
+        "Exam Date: 20/05/2026 onwards",
+        "Admit Card Available: 48 Hours before Exam"
     ],
     applicationFee: [
-      "General / OBC / EWS: ₹ 550/-",
-      "SC / ST: ₹ 550/-",
-      "Payment Mode: Pay the exam fee through Debit Card, Credit Card, Net Banking. (GST charges extra if applicable)"
+        "General / OBC / EWS: ₹ 550/-",
+        "SC / ST: ₹ 550/-",
+        "Payment Mode: Pay the exam fee through Debit Card, Credit Card, Net Banking. (GST charges extra if applicable)"
     ],
     ageLimit: [
-      "Minimum Age: 17.5 Years",
-      "Maximum Age: 21 Years",
-      "Date of Birth Block: Candidates born between 02/07/2005 and 03/01/2009 (both days inclusive) are eligible."
+        "Minimum Age: 17.5 Years",
+        "Maximum Age: 21 Years",
+        "Date of Birth Block: Candidates born between 02/07/2005 and 03/01/2009 (both days inclusive) are eligible."
     ],
     vacancyDetails: [
-      { postName: "Agniveer Vayu (Science Subjects)", totalPost: "TBA", eligibility: "10+2 Intermediate with Mathematics, Physics and English with Minimum 50% Marks in Aggregate and 50% Marks in English. OR 3 Year Diploma in Engineering (Mechanical / Electrical / Electronics / Automobile / Computer Science / Instrumentation Technology / Information Technology) with 50% Marks." },
-      { postName: "Agniveer Vayu (Other than Science Subjects)", totalPost: "TBA", eligibility: "10+2 Intermediate with Minimum 50% Marks Aggregate and 50% Marks in English." }
+        { postName: "Agniveer Vayu (Science Subjects)", totalPost: "TBA", eligibility: "10+2 Intermediate with Mathematics, Physics and English with Minimum 50% Marks in Aggregate and 50% Marks in English. OR 3 Year Diploma in Engineering (Mechanical / Electrical / Electronics / Automobile / Computer Science / Instrumentation Technology / Information Technology) with 50% Marks." },
+        { postName: "Agniveer Vayu (Other than Science Subjects)", totalPost: "TBA", eligibility: "10+2 Intermediate with Minimum 50% Marks Aggregate and 50% Marks in English." }
     ],
     importantLinks: [
-      { label: "Apply Online", url: "https://agnipathvayu.cdac.in/" },
-      { label: "Download Notification", url: "https://agnipathvayu.cdac.in/" },
-      { label: "Official Website", url: "https://indianairforce.nic.in/" }
+        { label: "Apply Online", url: "https://agnipathvayu.cdac.in/" }, 
+        { label: "Download Notification", url: "https://agnipathvayu.cdac.in/" },
+        { label: "Official Website", url: "https://indianairforce.nic.in/" }
     ]
   },
   "up-police-2026": {
@@ -624,32 +647,32 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     postDate: "15 January 2026",
     shortInfo: "Uttar Pradesh Police Recruitment & Promotion Board (UPPRPB) Lucknow has released the notification for the direct recruitment of Constables (Civil Police) for 60,244 posts. This is a massive recruitment drive by the UP Government. Both male and female candidates who have passed their 12th (Intermediate) examination are eligible to apply. The selection will be based on a Written Exam, Document Verification, and Physical Standard Test (PST)/Physical Efficiency Test (PET). Candidates are advised to read the full notification before applying.",
     importantDates: [
-      "Application Begin: 20/01/2026",
-      "Last Date for Apply Online: 20/02/2026",
-      "Pay Exam Fee Last Date: 20/02/2026",
-      "Correction Last Date: 22/02/2026",
-      "Exam Date: June 2026 (Tentative)",
-      "Admit Card Available: Before Exam"
+        "Application Begin: 20/01/2026",
+        "Last Date for Apply Online: 20/02/2026",
+        "Pay Exam Fee Last Date: 20/02/2026",
+        "Correction Last Date: 22/02/2026",
+        "Exam Date: June 2026 (Tentative)",
+        "Admit Card Available: Before Exam"
     ],
     applicationFee: [
-      "General / OBC: ₹ 400/-",
-      "SC / ST: ₹ 400/-",
-      "All Category Female: ₹ 400/-",
-      "Payment Mode: Pay the exam fee through Online Fee Mode Debit Card, Credit Card, Net Banking or Offline E-Challan Mode."
+        "General / OBC: ₹ 400/-",
+        "SC / ST: ₹ 400/-",
+        "All Category Female: ₹ 400/-",
+        "Payment Mode: Pay the exam fee through Online Fee Mode Debit Card, Credit Card, Net Banking or Offline E-Challan Mode."
     ],
     ageLimit: [
-      "Minimum Age: 18 Years",
-      "Maximum Age (Male): 25 Years",
-      "Maximum Age (Female): 28 Years",
-      "Age Relaxation: SC/ST/OBC/EWS Candidates Relaxation as per UP Govt Rules (Generally 5 Years)."
+        "Minimum Age: 18 Years",
+        "Maximum Age (Male): 25 Years",
+        "Maximum Age (Female): 28 Years",
+        "Age Relaxation: SC/ST/OBC/EWS Candidates Relaxation as per UP Govt Rules (Generally 5 Years)."
     ],
     vacancyDetails: [
-      { postName: "Constable (Civil Police)", totalPost: "60244", eligibility: "10+2 (Intermediate) Exam Passed from Any Recognized Board in India. (Appearing candidates are not eligible)." }
+        { postName: "Constable (Civil Police)", totalPost: "60244", eligibility: "10+2 (Intermediate) Exam Passed from Any Recognized Board in India. (Appearing candidates are not eligible)." }
     ],
     importantLinks: [
-      { label: "Apply Online", url: "https://uppbpb.gov.in/" },
-      { label: "Download Notification", url: "https://uppbpb.gov.in/" },
-      { label: "Official Website", url: "https://uppbpb.gov.in/" }
+        { label: "Apply Online", url: "https://uppbpb.gov.in/" },
+        { label: "Download Notification", url: "https://uppbpb.gov.in/" },
+        { label: "Official Website", url: "https://uppbpb.gov.in/" }
     ]
   },
   "bihar-gd-2026": {
@@ -708,15 +731,15 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
     importantLinks: [{ label: "Apply", url: "https://www.bsnl.co.in/" }]
   },
   "rrb-je-status": {
-    id: "rrb-je-status",
-    title: "RRB JE 2025 Application Status",
-    postDate: "Check Now",
-    shortInfo: "Railway Recruitment Boards (RRBs) have activated the link to check the application status for CEN 03/2024 (Junior Engineer). Candidates can check whether their application is provisionally accepted or rejected. If rejected, the reason for rejection will be displayed. This is a crucial step before the release of Admit Cards.",
-    importantDates: ["Status Out: Jan 2026", "Admit Card: 4 Days before exam"],
-    applicationFee: ["NA"],
-    ageLimit: ["NA"],
-    vacancyDetails: [{ postName: "Junior Engineer (JE)", totalPost: "7900+", eligibility: "Diploma/Degree in Engineering" }],
-    importantLinks: [{ label: "Check Status", url: "https://indianrailways.gov.in/" }]
+      id: "rrb-je-status",
+      title: "RRB JE 2025 Application Status",
+      postDate: "Check Now",
+      shortInfo: "Railway Recruitment Boards (RRBs) have activated the link to check the application status for CEN 03/2024 (Junior Engineer). Candidates can check whether their application is provisionally accepted or rejected. If rejected, the reason for rejection will be displayed. This is a crucial step before the release of Admit Cards.",
+      importantDates: ["Status Out: Jan 2026", "Admit Card: 4 Days before exam"],
+      applicationFee: ["NA"],
+      ageLimit: ["NA"],
+      vacancyDetails: [{ postName: "Junior Engineer (JE)", totalPost: "7900+", eligibility: "Diploma/Degree in Engineering" }],
+      importantLinks: [{ label: "Check Status", url: "https://indianrailways.gov.in/" }]
   },
   "ctet-date": {
     id: "ctet-date",
