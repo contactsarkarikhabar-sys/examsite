@@ -11,7 +11,7 @@ const getAI = () => {
 export const generateJobAdvice = async (userPrompt: string): Promise<string> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    return "Please select a Google API Key to use the AI features.";
+    return "नमस्ते! मैं ExamSite AI हूँ। आप मुझसे नौकरियों, पात्रता, और परीक्षा पैटर्न के बारे में पूछ सकते हैं। कृपया अपना सवाल पूछें!";
   }
 
   try {
@@ -37,7 +37,7 @@ export const generateJobAdvice = async (userPrompt: string): Promise<string> => 
         `,
       }
     });
-    
+
     return response.text || "Sorry, I couldn't generate a response at this time.";
   } catch (error) {
     console.error("Gemini API Error:", error);
@@ -48,7 +48,7 @@ export const generateJobAdvice = async (userPrompt: string): Promise<string> => 
 export const generateSpeech = async (text: string): Promise<string | null> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) return null;
-  
+
   try {
     const ai = getAI();
     // We use gemini-2.5-flash-preview-tts for speech generation
@@ -58,13 +58,13 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
         },
       },
     });
-    
+
     // Extract base64 audio data
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
   } catch (error) {
