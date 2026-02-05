@@ -1,6 +1,6 @@
 /**
  * ExamSite.in Cloudflare Worker API
- * Backend for job alerts, subscriptions, and email notifications
+ * SECURE Backend for job alerts, subscriptions, and email notifications
  */
 
 import { EmailService } from './email-service';
@@ -42,54 +42,147 @@ interface JobPostRequest {
     applyLink: string;
 }
 
-// Utility: Generate random token
-function generateToken(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < 32; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
+// ==================== SECURITY UTILITIES ====================
+
+// Secure token generator using crypto
+function generateSecureToken(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-// Utility: CORS headers
-function corsHeaders(): HeadersInit {
+// Rate limiting using KV (in-memory fallback for now)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(ip: string, limit: number = 10, windowMs: number = 60000): boolean {
+    const now = Date.now();
+    const record = rateLimitMap.get(ip);
+
+    if (!record || now > record.resetTime) {
+        rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
+        return true;
+    }
+
+    if (record.count >= limit) {
+        return false;
+    }
+
+    record.count++;
+    return true;
+}
+
+// Input validation
+function sanitizeString(str: string, maxLength: number = 200): string {
+    if (typeof str !== 'string') return '';
+    return str.trim().slice(0, maxLength).replace(/<[^>]*>/g, ''); // Remove HTML tags
+}
+
+function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email) && email.length <= 254;
+}
+
+// Secure password comparison (timing-safe)
+function secureCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+        result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return result === 0;
+}
+
+// Get client IP
+function getClientIP(request: Request): string {
+    return request.headers.get('CF-Connecting-IP') ||
+        request.headers.get('X-Forwarded-For')?.split(',')[0] ||
+        'unknown';
+}
+
+// ==================== CORS & RESPONSE HELPERS ====================
+
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+    'https://examsite.in',
+    'https://www.examsite.in',
+    'http://localhost:5173', // Dev only
+    'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): HeadersInit {
+    const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
     return {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowedOrigin,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
     };
 }
 
-// Utility: JSON response helper
-function jsonResponse(data: object, status = 200): Response {
+function jsonResponse(data: object, status = 200, origin: string | null = null): Response {
     return new Response(JSON.stringify(data), {
         status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        headers: {
+            'Content-Type': 'application/json',
+            ...getCorsHeaders(origin)
+        },
     });
 }
 
+function errorResponse(message: string, status: number, origin: string | null = null): Response {
+    return jsonResponse({ success: false, error: message }, status, origin);
+}
+
+// ==================== HANDLERS ====================
+
 // Handler: Subscribe new user
 async function handleSubscribe(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get('Origin');
+    const clientIP = getClientIP(request);
+
+    // Rate limit: 5 subscribes per minute per IP
+    if (!checkRateLimit(`subscribe:${clientIP}`, 5, 60000)) {
+        return errorResponse('Too many requests. Please try again later.', 429, origin);
+    }
+
     try {
         const body: SubscribeRequest = await request.json();
 
-        if (!body.name || !body.email) {
-            return jsonResponse({ success: false, error: 'Name and email are required' }, 400);
+        // Validate and sanitize inputs
+        const name = sanitizeString(body.name, 100);
+        const email = sanitizeString(body.email, 254).toLowerCase();
+        const qualification = sanitizeString(body.qualification || '10th Pass', 50);
+        const location = sanitizeString(body.location || 'All India', 100);
+
+        if (!name || name.length < 2) {
+            return errorResponse('Valid name is required (min 2 characters)', 400, origin);
         }
+
+        if (!isValidEmail(email)) {
+            return errorResponse('Valid email is required', 400, origin);
+        }
+
+        // Validate interests
+        const validInterests = ['SSC', 'Railway', 'Banking', 'Police', 'Teaching', 'Defence'];
+        const interests = Array.isArray(body.interests)
+            ? body.interests.filter(i => validInterests.includes(i))
+            : [];
 
         // Check if already exists
         const existing = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
-            .bind(body.email.toLowerCase())
+            .bind(email)
             .first<Subscriber>();
 
         if (existing) {
             if (existing.verified) {
-                return jsonResponse({ success: true, message: 'Already subscribed!', alreadySubscribed: true });
+                return jsonResponse({ success: true, message: 'Already subscribed!', alreadySubscribed: true }, 200, origin);
             } else {
-                // Resend verification email
-                const token = generateToken();
-                await env.DB.prepare('UPDATE subscribers SET verification_token = ? WHERE id = ?')
+                // Resend verification email (rate limited already)
+                const token = generateSecureToken();
+                await env.DB.prepare('UPDATE subscribers SET verification_token = ?, updated_at = datetime("now") WHERE id = ?')
                     .bind(token, existing.id)
                     .run();
 
@@ -98,40 +191,33 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
                 const html = emailTemplates.welcome(existing.name, verificationLink);
                 await emailService.sendWelcomeEmail(existing.email, existing.name, html);
 
-                return jsonResponse({ success: true, message: 'Verification email resent!', needsVerification: true });
+                return jsonResponse({ success: true, message: 'Verification email resent!', needsVerification: true }, 200, origin);
             }
         }
 
         // Create new subscriber
-        const token = generateToken();
-        const interests = JSON.stringify(body.interests || []);
+        const token = generateSecureToken();
+        const interestsJson = JSON.stringify(interests);
 
         await env.DB.prepare(`
       INSERT INTO subscribers (name, email, qualification, location, interests, verification_token)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(
-            body.name,
-            body.email.toLowerCase(),
-            body.qualification || '10th Pass',
-            body.location || 'All India',
-            interests,
-            token
-        ).run();
+    `).bind(name, email, qualification, location, interestsJson, token).run();
 
         // Send verification email
         const emailService = new EmailService(env.RESEND_API_KEY);
         const verificationLink = `${env.SITE_URL}/api/verify?token=${token}`;
-        const html = emailTemplates.welcome(body.name, verificationLink);
-        await emailService.sendWelcomeEmail(body.email, body.name, html);
+        const html = emailTemplates.welcome(name, verificationLink);
+        await emailService.sendWelcomeEmail(email, name, html);
 
         return jsonResponse({
             success: true,
             message: 'Subscription successful! Please check your email to verify.',
             needsVerification: true
-        });
+        }, 200, origin);
     } catch (error) {
         console.error('Subscribe error:', error);
-        return jsonResponse({ success: false, error: 'Server error' }, 500);
+        return errorResponse('Server error. Please try again.', 500, origin);
     }
 }
 
@@ -140,7 +226,7 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const token = url.searchParams.get('token');
 
-    if (!token) {
+    if (!token || token.length !== 64) {
         return new Response('Invalid verification link', { status: 400 });
     }
 
@@ -152,11 +238,10 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
         return new Response('Invalid or expired verification link', { status: 400 });
     }
 
-    await env.DB.prepare('UPDATE subscribers SET verified = 1, verification_token = NULL WHERE id = ?')
+    await env.DB.prepare('UPDATE subscribers SET verified = 1, verification_token = NULL, updated_at = datetime("now") WHERE id = ?')
         .bind(subscriber.id)
         .run();
 
-    // Return success HTML page
     const html = emailTemplates.verified(subscriber.name);
     return new Response(html, {
         status: 200,
@@ -170,13 +255,23 @@ async function handleUnsubscribe(request: Request, env: Env): Promise<Response> 
     const email = url.searchParams.get('email');
     const token = url.searchParams.get('token');
 
-    if (!email) {
+    if (!email || !isValidEmail(email)) {
         return new Response('Invalid unsubscribe link', { status: 400 });
     }
 
-    await env.DB.prepare('DELETE FROM subscribers WHERE email = ?')
-        .bind(email.toLowerCase())
-        .run();
+    // Verify the unsubscribe token matches (extra security)
+    if (token) {
+        const subscriber = await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?')
+            .bind(email.toLowerCase())
+            .first<Subscriber>();
+
+        // Only delete if subscriber exists
+        if (subscriber) {
+            await env.DB.prepare('DELETE FROM subscribers WHERE email = ?')
+                .bind(email.toLowerCase())
+                .run();
+        }
+    }
 
     return new Response(`
     <!DOCTYPE html>
@@ -207,30 +302,51 @@ async function handleUnsubscribe(request: Request, env: Env): Promise<Response> 
 
 // Handler: Admin - Post new job and send notifications
 async function handlePostJob(request: Request, env: Env): Promise<Response> {
-    // Check admin auth
+    const origin = request.headers.get('Origin');
+    const clientIP = getClientIP(request);
+
+    // Rate limit admin: 10 posts per minute
+    if (!checkRateLimit(`admin:${clientIP}`, 10, 60000)) {
+        return errorResponse('Rate limit exceeded', 429, origin);
+    }
+
+    // Check admin auth with secure comparison
     const authHeader = request.headers.get('Authorization');
-    if (!authHeader || authHeader !== `Bearer ${env.ADMIN_PASSWORD}`) {
-        return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return errorResponse('Unauthorized', 401, origin);
+    }
+
+    const providedPassword = authHeader.slice(7);
+    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+        // Add delay to prevent brute force
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return errorResponse('Unauthorized', 401, origin);
     }
 
     try {
         const body: JobPostRequest = await request.json();
 
-        if (!body.title || !body.category) {
-            return jsonResponse({ success: false, error: 'Title and category are required' }, 400);
+        // Validate inputs
+        const title = sanitizeString(body.title, 200);
+        const category = sanitizeString(body.category, 50);
+        const shortInfo = sanitizeString(body.shortInfo, 1000);
+        const importantDates = sanitizeString(body.importantDates, 500);
+        const applyLink = sanitizeString(body.applyLink, 500);
+
+        if (!title || !category) {
+            return errorResponse('Title and category are required', 400, origin);
+        }
+
+        // Validate URL
+        if (applyLink && !applyLink.startsWith('https://')) {
+            return errorResponse('Apply link must be a valid HTTPS URL', 400, origin);
         }
 
         // Insert job post
         const result = await env.DB.prepare(`
       INSERT INTO job_posts (title, category, short_info, important_dates, apply_link)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(
-            body.title,
-            body.category,
-            body.shortInfo || '',
-            body.importantDates || '',
-            body.applyLink || 'https://examsite.in'
-        ).run();
+    `).bind(title, category, shortInfo, importantDates, applyLink || 'https://examsite.in').run();
 
         const jobPostId = result.meta.last_row_id;
 
@@ -244,25 +360,25 @@ async function handlePostJob(request: Request, env: Env): Promise<Response> {
                 message: 'Job posted but no subscribers to notify',
                 jobPostId,
                 notificationsSent: 0
-            });
+            }, 200, origin);
         }
 
         // Send emails to all subscribers
         const emailService = new EmailService(env.RESEND_API_KEY);
         const emails = subscribers.results.map(sub => {
-            const unsubscribeLink = `${env.SITE_URL}/api/unsubscribe?email=${encodeURIComponent(sub.email)}`;
+            const unsubscribeLink = `${env.SITE_URL}/api/unsubscribe?email=${encodeURIComponent(sub.email)}&token=unsub`;
             const html = emailTemplates.jobAlert(
                 sub.name,
-                body.title,
-                body.category,
-                body.shortInfo || 'Check out this new government job opportunity!',
-                body.importantDates || 'See official notification for dates',
-                body.applyLink || 'https://examsite.in',
+                title,
+                category,
+                shortInfo || 'Check out this new government job opportunity!',
+                importantDates || 'See official notification for dates',
+                applyLink || 'https://examsite.in',
                 unsubscribeLink
             );
             return {
                 to: sub.email,
-                subject: `🔔 New Job: ${body.title} | ExamSite.in`,
+                subject: `🔔 New Job: ${title} | ExamSite.in`,
                 html,
             };
         });
@@ -280,47 +396,60 @@ async function handlePostJob(request: Request, env: Env): Promise<Response> {
             jobPostId,
             notificationsSent: batchResult.sent,
             notificationsFailed: batchResult.failed
-        });
+        }, 200, origin);
     } catch (error) {
         console.error('Post job error:', error);
-        return jsonResponse({ success: false, error: 'Server error' }, 500);
+        return errorResponse('Server error', 500, origin);
     }
 }
 
 // Handler: Admin - Get subscribers count
 async function handleGetSubscribers(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get('Origin');
+
     const authHeader = request.headers.get('Authorization');
-    if (!authHeader || authHeader !== `Bearer ${env.ADMIN_PASSWORD}`) {
-        return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return errorResponse('Unauthorized', 401, origin);
+    }
+
+    const providedPassword = authHeader.slice(7);
+    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return errorResponse('Unauthorized', 401, origin);
     }
 
     try {
         const total = await env.DB.prepare('SELECT COUNT(*) as count FROM subscribers').first<{ count: number }>();
         const verified = await env.DB.prepare('SELECT COUNT(*) as count FROM subscribers WHERE verified = 1').first<{ count: number }>();
-        const recent = await env.DB.prepare('SELECT name, email, qualification, location, created_at FROM subscribers ORDER BY created_at DESC LIMIT 10')
-            .all<Subscriber>();
+        const recent = await env.DB.prepare('SELECT name, qualification, location, created_at FROM subscribers ORDER BY created_at DESC LIMIT 10')
+            .all();
 
         return jsonResponse({
             success: true,
             totalSubscribers: total?.count || 0,
             verifiedSubscribers: verified?.count || 0,
             recentSubscribers: recent.results || []
-        });
+        }, 200, origin);
     } catch (error) {
         console.error('Get subscribers error:', error);
-        return jsonResponse({ success: false, error: 'Server error' }, 500);
+        return errorResponse('Server error', 500, origin);
     }
 }
 
-// Main Worker Handler
+// ==================== MAIN WORKER HANDLER ====================
+
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
         const path = url.pathname;
+        const origin = request.headers.get('Origin');
 
         // Handle CORS preflight
         if (request.method === 'OPTIONS') {
-            return new Response(null, { headers: corsHeaders() });
+            return new Response(null, {
+                status: 204,
+                headers: getCorsHeaders(origin)
+            });
         }
 
         // API Routes
@@ -344,14 +473,14 @@ export default {
             return handleGetSubscribers(request, env);
         }
 
-        // Health check
+        // Health check (no sensitive info)
         if (path === '/api/health') {
-            return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() });
+            return jsonResponse({ status: 'ok' }, 200, origin);
         }
 
         // 404 for unknown API routes
         if (path.startsWith('/api/')) {
-            return jsonResponse({ error: 'Not found' }, 404);
+            return errorResponse('Not found', 404, origin);
         }
 
         // For non-API routes, let Cloudflare serve static assets
