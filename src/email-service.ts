@@ -18,7 +18,7 @@ export class EmailService {
     private apiKey: string;
     private fromEmail: string;
 
-    constructor(apiKey: string, fromEmail: string = 'ExamSite.in <alerts@examsite.in>') {
+    constructor(apiKey: string, fromEmail: string = 'ExamSite.in <onboarding@resend.dev>') {
         this.apiKey = apiKey;
         this.fromEmail = fromEmail;
     }
