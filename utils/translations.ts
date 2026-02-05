@@ -13,7 +13,7 @@ export const translations = {
     privacyPolicy: "Privacy Policy",
     followUs: "Follow us:",
     searchPlaceholder: "Search jobs, admit cards...",
-    
+
     // Marquee
     latest: "Latest",
 
@@ -39,7 +39,7 @@ export const translations = {
     "Answer Key": "Answer Key",
     "Sarkari Yojana (Government Schemes)": "Sarkari Yojana",
     "Certificate Verification": "Certificate Verification",
-    
+
     // Category Box
     new: "NEW",
     viewMore: "View More",
@@ -57,7 +57,7 @@ export const translations = {
     disclaimer: "Disclaimer",
     terms: "Terms & Conditions",
     rightsReserved: "All rights reserved.",
-    demoDisclaimer: "Disclaimer: This is a demo application created for educational purposes.",
+    demoDisclaimer: "ExamSite.in - India's Most Trusted Government Job Portal",
 
     // Job Detail
     backToJobs: "Back to Jobs",
@@ -96,7 +96,7 @@ export const translations = {
     aiGreeting: "Hi! I am ExamSite AI. Ask me about latest jobs, eligibility, or exam patterns.",
     askPlaceholder: "Ask about jobs...",
     somethingWrong: "Something went wrong.",
-    
+
     // Alert Modal
     alertTitle: "Free Job Alerts",
     alertDesc: "Get the latest ExamSite updates delivered directly to your inbox.",
@@ -109,7 +109,7 @@ export const translations = {
     subscribed: "Subscribed!",
     subscribedDesc: "You have successfully subscribed to job alerts. We'll keep you updated.",
     enterName: "Enter your name",
-    
+
     // Category Detail
     showingUpdates: "Showing all updates and notifications",
     searchIn: "Search in",
@@ -132,7 +132,7 @@ export const translations = {
     privacyPolicy: "गोपनीयता नीति",
     followUs: "फॉलो करें:",
     searchPlaceholder: "नौकरियां, एडमिट कार्ड खोजें...",
-    
+
     // Marquee
     latest: "नवीनतम",
 
@@ -176,7 +176,7 @@ export const translations = {
     disclaimer: "अस्वीकरण",
     terms: "नियम और शर्तें",
     rightsReserved: "सर्वाधिकार सुरक्षित।",
-    demoDisclaimer: "अस्वीकरण: यह शैक्षिक उद्देश्यों के लिए बनाया गया एक डेमो एप्लिकेशन है।",
+    demoDisclaimer: "ExamSite.in - भारत का सबसे भरोसेमंद सरकारी नौकरी पोर्टल",
 
     // Job Detail
     backToJobs: "नौकरियों पर वापस जाएं",
@@ -240,6 +240,6 @@ export const translations = {
 };
 
 export const translateSectionTitle = (title: string, lang: 'en' | 'hi') => {
-    if (lang === 'en') return title;
-    return translations.hi[title as keyof typeof translations.hi] || title;
+  if (lang === 'en') return title;
+  return translations.hi[title as keyof typeof translations.hi] || title;
 };
