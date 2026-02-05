@@ -191,8 +191,20 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     // Generate TypeScript code
     const generateCode = () => {
         const id = fullJobForm.id || generateId(fullJobForm.title);
+        const category = fullJobForm.category;
 
-        const code = `  "${id}": {
+        // Map category to section title
+        const sectionMap: Record<string, string> = {
+            'Latest Jobs': 'New Updates',
+            'Results': 'Results',
+            'Admit Card': 'Admit Card',
+            'Answer Key': 'Answer Key',
+            'Syllabus': 'Syllabus',
+            'Admission': 'Admission'
+        };
+        const sectionTitle = sectionMap[category] || 'New Updates';
+
+        const detailsCode = `  "${id}": {
     id: "${id}",
     title: "${fullJobForm.title}",
     postDate: "${fullJobForm.postDate}",
@@ -218,8 +230,21 @@ ${fullJobForm.importantLinks.filter(l => l.label).map(l =>
     ]
   },`;
 
-        setGeneratedCode(code);
-        setMessage({ type: 'success', text: '✅ Code generated! Copy and paste into constants.ts' });
+        const sectionCode = `// ═══════════════════════════════════════════════════════════
+// STEP 1: Add this to JOB_DETAILS_DB in constants.ts:
+// ═══════════════════════════════════════════════════════════
+
+${detailsCode}
+
+// ═══════════════════════════════════════════════════════════
+// STEP 2: Add to MOCK_SECTIONS → "${sectionTitle}" section:
+// Find the section with title: "${sectionTitle}" and add this to items[]:
+// ═══════════════════════════════════════════════════════════
+
+{ id: "${id}", title: "${fullJobForm.title}", isNew: true, link: "#" },`;
+
+        setGeneratedCode(sectionCode);
+        setMessage({ type: 'success', text: `✅ Code generated! Add to "${sectionTitle}" section` });
     };
 
     const copyCode = () => {
