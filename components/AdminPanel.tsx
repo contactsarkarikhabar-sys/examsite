@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Users, Bell, Loader2, CheckCircle, AlertCircle, Lock, Plus, Trash2, Copy } from 'lucide-react';
+import { X, Send, Users, Bell, Loader2, CheckCircle, AlertCircle, Lock, Plus, Trash2, Copy, Edit, Search } from 'lucide-react';
 import { jobService } from '../services/jobService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { VacancyItem, LinkItem, JobDetailData } from '../types';
+import { JOB_DETAILS_DB } from '../constants';
 
 interface Props {
     isOpen: boolean;
@@ -45,6 +46,16 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     // Full Job Form (complete details)
     const [fullJobForm, setFullJobForm] = useState(emptyJobForm);
     const [generatedCode, setGeneratedCode] = useState('');
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [selectedJobId, setSelectedJobId] = useState('');
+    const [searchFilter, setSearchFilter] = useState('');
+
+    // Get job list from constants
+    const jobList = Object.keys(JOB_DETAILS_DB).map(id => ({ id, title: JOB_DETAILS_DB[id].title }));
+    const filteredJobList = jobList.filter(job =>
+        job.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        job.id.toLowerCase().includes(searchFilter.toLowerCase())
+    );
 
     const { language } = useLanguage();
 
@@ -216,10 +227,50 @@ ${fullJobForm.importantLinks.filter(l => l.label).map(l =>
         setMessage({ type: 'success', text: '✅ Code copied to clipboard!' });
     };
 
+    // Load existing job for editing
+    const loadExistingJob = (jobId: string) => {
+        const job = JOB_DETAILS_DB[jobId];
+        if (job) {
+            setFullJobForm({
+                id: job.id,
+                title: job.title,
+                category: 'Latest Jobs',
+                postDate: job.postDate,
+                shortInfo: job.shortInfo,
+                importantDates: job.importantDates.length ? job.importantDates : [''],
+                applicationFee: job.applicationFee.length ? job.applicationFee : [''],
+                ageLimit: job.ageLimit.length ? job.ageLimit : [''],
+                vacancyDetails: job.vacancyDetails.length ? job.vacancyDetails : [{ postName: '', totalPost: '', eligibility: '' }],
+                importantLinks: job.importantLinks.length ? job.importantLinks : [{ label: '', url: '' }]
+            });
+            setSelectedJobId(jobId);
+            setIsEditMode(true);
+            setGeneratedCode('');
+            setMessage({ type: 'success', text: `✅ Loaded: ${job.title}` });
+        }
+    };
+
+    // Generate delete instruction
+    const generateDeleteCode = (jobId: string) => {
+        const deleteCode = `// DELETE THIS ENTRY FROM constants.ts:
+// Find and remove the following entry in JOB_DETAILS_DB:
+
+"${jobId}": {
+  // ... entire object ...
+},
+
+// Also remove from MOCK_SECTIONS if listed there.`;
+        setGeneratedCode(deleteCode);
+        setMessage({ type: 'success', text: `🗑️ Delete instructions generated for: ${jobId}` });
+    };
+
     const resetForm = () => {
         setFullJobForm(emptyJobForm);
         setGeneratedCode('');
         setMessage(null);
+        setIsEditMode(false);
+        setSelectedJobId('');
+        setSearchFilter('');
     };
 
     if (!isOpen) return null;
@@ -403,10 +454,63 @@ ${fullJobForm.importantLinks.filter(l => l.label).map(l =>
                             {activeTab === 'full' && (
                                 <div className="bg-blue-50 rounded-xl p-5">
                                     <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                        📝 Create Full Job Details (for constants.ts)
+                                        📝 {isEditMode ? `Edit: ${selectedJobId}` : 'Create New Job Details'}
                                     </h4>
+
+                                    {/* Load Existing Job Section */}
+                                    <div className="bg-white p-4 rounded-lg border mb-4">
+                                        <p className="text-sm font-bold text-gray-700 mb-2">📂 Load Existing Job to Edit/Delete:</p>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    value={searchFilter}
+                                                    onChange={e => setSearchFilter(e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+                                                    placeholder="Search jobs by title or ID..."
+                                                />
+                                            </div>
+                                        </div>
+                                        {searchFilter && (
+                                            <div className="mt-2 max-h-40 overflow-y-auto border rounded-lg bg-gray-50">
+                                                {filteredJobList.slice(0, 10).map(job => (
+                                                    <div key={job.id} className="flex justify-between items-center p-2 hover:bg-blue-50 border-b last:border-b-0">
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium truncate">{job.title}</p>
+                                                            <p className="text-xs text-gray-500">{job.id}</p>
+                                                        </div>
+                                                        <div className="flex gap-1 ml-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { loadExistingJob(job.id); setSearchFilter(''); }}
+                                                                className="bg-blue-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1"
+                                                            >
+                                                                <Edit size={12} /> Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { generateDeleteCode(job.id); setSearchFilter(''); }}
+                                                                className="bg-red-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1"
+                                                            >
+                                                                <Trash2 size={12} /> Delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {filteredJobList.length > 10 && (
+                                                    <p className="text-xs text-gray-500 p-2 text-center">+{filteredJobList.length - 10} more results...</p>
+                                                )}
+                                                {filteredJobList.length === 0 && (
+                                                    <p className="text-xs text-gray-500 p-2 text-center">No jobs found</p>
+                                                )}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-2">Total: {jobList.length} jobs in database</p>
+                                    </div>
+
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Fill the form below. Click "Generate Code" to get TypeScript code for constants.ts
+                                        {isEditMode ? '✏️ Edit the loaded job and click "Generate Code" to get updated code.' : 'Fill the form below. Click "Generate Code" to get TypeScript code for constants.ts'}
                                     </p>
 
                                     <div className="space-y-4">
