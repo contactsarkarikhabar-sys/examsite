@@ -88,26 +88,43 @@ const StaticContent: React.FC<Props> = ({ type }) => {
                   {/* Contact Form */}
                   <div>
                     <ContentSection title={language === 'hi' ? '✉️ संदेश भेजें' : '✉️ Send Message'}>
-                      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+                      <form className="space-y-4" onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.target as HTMLFormElement;
+                        const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+                        const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                        const message = (form.elements.namedItem('message') as HTMLTextAreaElement).value;
+
+                        if (!name || !email || !message) {
+                          alert(language === 'hi' ? 'कृपया सभी फ़ील्ड भरें' : 'Please fill all fields');
+                          return;
+                        }
+
+                        const subject = encodeURIComponent(`Contact from ${name} - ExamSite.in`);
+                        const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`);
+                        window.location.href = `mailto:contact.examsite@gmail.com?subject=${subject}&body=${body}`;
+
+                        alert(language === 'hi' ? '✅ आपका ईमेल ऐप खुलेगा। कृपया वहां से संदेश भेजें।' : '✅ Your email app will open. Please send the message from there.');
+                      }}>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             {language === 'hi' ? 'आपका नाम' : 'Your Name'}
                           </label>
-                          <input type="text" className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder={language === 'hi' ? 'नाम दर्ज करें' : 'Enter your name'} />
+                          <input name="name" type="text" required className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder={language === 'hi' ? 'नाम दर्ज करें' : 'Enter your name'} />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             {language === 'hi' ? 'ईमेल' : 'Email'}
                           </label>
-                          <input type="email" className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder={language === 'hi' ? 'ईमेल दर्ज करें' : 'Enter your email'} />
+                          <input name="email" type="email" required className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder={language === 'hi' ? 'ईमेल दर्ज करें' : 'Enter your email'} />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             {language === 'hi' ? 'संदेश' : 'Message'}
                           </label>
-                          <textarea rows={4} className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder={language === 'hi' ? 'अपना संदेश लिखें...' : 'Write your message...'}></textarea>
+                          <textarea name="message" rows={4} required className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder={language === 'hi' ? 'अपना संदेश लिखें...' : 'Write your message...'}></textarea>
                         </div>
-                        <button className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition flex items-center justify-center">
+                        <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition flex items-center justify-center">
                           <Send size={18} className="mr-2" />
                           {language === 'hi' ? 'संदेश भेजें' : 'Send Message'}
                         </button>
