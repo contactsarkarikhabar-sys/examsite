@@ -295,5 +295,93 @@ export const jobService = {
     } catch (error) {
       return { total: 0, verified: 0 };
     }
+  },
+
+  // Admin: Get all jobs from database
+  getAllDbJobs: async (adminPassword: string): Promise<{ id: string; title: string; category: string }[]> => {
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      if (!workerUrl) return [];
+
+      const response = await fetch(`${workerUrl}/api/jobs`, {
+        headers: { 'Authorization': `Bearer ${adminPassword}` },
+      });
+
+      const data = await response.json();
+      return data.jobs || [];
+    } catch (error) {
+      console.error('Get all DB jobs error:', error);
+      return [];
+    }
+  },
+
+  // Admin: Save job (create or update)
+  saveJob: async (
+    jobData: {
+      id: string;
+      title: string;
+      category?: string;
+      postDate?: string;
+      shortInfo?: string;
+      importantDates?: string[];
+      applicationFee?: string[];
+      ageLimit?: string[];
+      vacancyDetails?: { postName: string; totalPost: string; eligibility: string }[];
+      importantLinks?: { label: string; url: string }[];
+    },
+    adminPassword: string
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+
+      if (!workerUrl) {
+        return { success: false, message: 'Worker URL not configured' };
+      }
+
+      const response = await fetch(`${workerUrl}/api/admin/jobs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminPassword}`,
+        },
+        body: JSON.stringify(jobData),
+      });
+
+      const data = await response.json();
+      return {
+        success: data.success,
+        message: data.message || 'Job saved!',
+      };
+    } catch (error) {
+      console.error('Save job error:', error);
+      return { success: false, message: 'Failed to save job' };
+    }
+  },
+
+  // Admin: Delete job
+  deleteJob: async (jobId: string, adminPassword: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+
+      if (!workerUrl) {
+        return { success: false, message: 'Worker URL not configured' };
+      }
+
+      const response = await fetch(`${workerUrl}/api/admin/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminPassword}`,
+        },
+      });
+
+      const data = await response.json();
+      return {
+        success: data.success,
+        message: data.message || 'Job deleted!',
+      };
+    } catch (error) {
+      console.error('Delete job error:', error);
+      return { success: false, message: 'Failed to delete job' };
+    }
   }
 };

@@ -437,6 +437,176 @@ async function handleGetSubscribers(request: Request, env: Env): Promise<Respons
     }
 }
 
+// ==================== JOB DETAILS CRUD ====================
+
+interface JobDetailRequest {
+    id: string;
+    title: string;
+    category?: string;
+    postDate?: string;
+    shortInfo?: string;
+    importantDates?: string[];
+    applicationFee?: string[];
+    ageLimit?: string[];
+    vacancyDetails?: { postName: string; totalPost: string; eligibility: string }[];
+    importantLinks?: { label: string; url: string }[];
+}
+
+// Handler: Get all jobs (public)
+async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get('Origin');
+    try {
+        const jobs = await env.DB.prepare('SELECT * FROM job_details WHERE is_active = 1 ORDER BY updated_at DESC')
+            .all();
+
+        // Parse JSON fields
+        const parsedJobs = jobs.results?.map((job: any) => ({
+            ...job,
+            importantDates: JSON.parse(job.important_dates || '[]'),
+            applicationFee: JSON.parse(job.application_fee || '[]'),
+            ageLimit: JSON.parse(job.age_limit || '[]'),
+            vacancyDetails: JSON.parse(job.vacancy_details || '[]'),
+            importantLinks: JSON.parse(job.important_links || '[]'),
+        })) || [];
+
+        return jsonResponse({ success: true, jobs: parsedJobs, count: parsedJobs.length }, 200, origin);
+    } catch (error) {
+        console.error('Get all jobs error:', error);
+        return errorResponse('Server error', 500, origin);
+    }
+}
+
+// Handler: Get single job by ID (public)
+async function handleGetJob(request: Request, env: Env, jobId: string): Promise<Response> {
+    const origin = request.headers.get('Origin');
+    try {
+        const job = await env.DB.prepare('SELECT * FROM job_details WHERE id = ?')
+            .bind(jobId)
+            .first();
+
+        if (!job) {
+            return errorResponse('Job not found', 404, origin);
+        }
+
+        const parsedJob = {
+            ...job,
+            importantDates: JSON.parse((job as any).important_dates || '[]'),
+            applicationFee: JSON.parse((job as any).application_fee || '[]'),
+            ageLimit: JSON.parse((job as any).age_limit || '[]'),
+            vacancyDetails: JSON.parse((job as any).vacancy_details || '[]'),
+            importantLinks: JSON.parse((job as any).important_links || '[]'),
+        };
+
+        return jsonResponse({ success: true, job: parsedJob }, 200, origin);
+    } catch (error) {
+        console.error('Get job error:', error);
+        return errorResponse('Server error', 500, origin);
+    }
+}
+
+// Handler: Create or Update job (admin only)
+async function handleSaveJob(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get('Origin');
+
+    // Auth check
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return errorResponse('Unauthorized', 401, origin);
+    }
+    const providedPassword = authHeader.slice(7);
+    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return errorResponse('Unauthorized', 401, origin);
+    }
+
+    try {
+        const body: JobDetailRequest = await request.json();
+
+        if (!body.id || !body.title) {
+            return errorResponse('ID and Title are required', 400, origin);
+        }
+
+        const id = sanitizeString(body.id, 100);
+        const title = sanitizeString(body.title, 200);
+        const category = sanitizeString(body.category || 'Latest Jobs', 50);
+        const postDate = sanitizeString(body.postDate || '', 100);
+        const shortInfo = sanitizeString(body.shortInfo || '', 5000);
+
+        // Check if exists
+        const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
+            .bind(id)
+            .first();
+
+        if (existing) {
+            // Update
+            await env.DB.prepare(`
+                UPDATE job_details SET
+                    title = ?, category = ?, post_date = ?, short_info = ?,
+                    important_dates = ?, application_fee = ?, age_limit = ?,
+                    vacancy_details = ?, important_links = ?, updated_at = datetime('now')
+                WHERE id = ?
+            `).bind(
+                title, category, postDate, shortInfo,
+                JSON.stringify(body.importantDates || []),
+                JSON.stringify(body.applicationFee || []),
+                JSON.stringify(body.ageLimit || []),
+                JSON.stringify(body.vacancyDetails || []),
+                JSON.stringify(body.importantLinks || []),
+                id
+            ).run();
+
+            return jsonResponse({ success: true, message: 'Job updated successfully', id }, 200, origin);
+        } else {
+            // Insert
+            await env.DB.prepare(`
+                INSERT INTO job_details (id, title, category, post_date, short_info,
+                    important_dates, application_fee, age_limit, vacancy_details, important_links)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+                id, title, category, postDate, shortInfo,
+                JSON.stringify(body.importantDates || []),
+                JSON.stringify(body.applicationFee || []),
+                JSON.stringify(body.ageLimit || []),
+                JSON.stringify(body.vacancyDetails || []),
+                JSON.stringify(body.importantLinks || [])
+            ).run();
+
+            return jsonResponse({ success: true, message: 'Job created successfully', id }, 201, origin);
+        }
+    } catch (error) {
+        console.error('Save job error:', error);
+        return errorResponse('Server error', 500, origin);
+    }
+}
+
+// Handler: Delete job (admin only)
+async function handleDeleteJob(request: Request, env: Env, jobId: string): Promise<Response> {
+    const origin = request.headers.get('Origin');
+
+    // Auth check
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return errorResponse('Unauthorized', 401, origin);
+    }
+    const providedPassword = authHeader.slice(7);
+    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return errorResponse('Unauthorized', 401, origin);
+    }
+
+    try {
+        // Soft delete
+        await env.DB.prepare('UPDATE job_details SET is_active = 0, updated_at = datetime("now") WHERE id = ?')
+            .bind(jobId)
+            .run();
+
+        return jsonResponse({ success: true, message: 'Job deleted successfully' }, 200, origin);
+    } catch (error) {
+        console.error('Delete job error:', error);
+        return errorResponse('Server error', 500, origin);
+    }
+}
+
 // ==================== MAIN WORKER HANDLER ====================
 
 export default {
@@ -472,6 +642,25 @@ export default {
 
         if (path === '/api/admin/subscribers' && request.method === 'GET') {
             return handleGetSubscribers(request, env);
+        }
+
+        // Job Details CRUD Routes
+        if (path === '/api/jobs' && request.method === 'GET') {
+            return handleGetAllJobs(request, env);
+        }
+
+        if (path.startsWith('/api/jobs/') && request.method === 'GET') {
+            const jobId = path.replace('/api/jobs/', '');
+            return handleGetJob(request, env, jobId);
+        }
+
+        if (path === '/api/admin/jobs' && request.method === 'POST') {
+            return handleSaveJob(request, env);
+        }
+
+        if (path.startsWith('/api/admin/jobs/') && request.method === 'DELETE') {
+            const jobId = path.replace('/api/admin/jobs/', '');
+            return handleDeleteJob(request, env, jobId);
         }
 
         // Debug: Test email sending directly

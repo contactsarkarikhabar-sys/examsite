@@ -252,6 +252,57 @@ ${detailsCode}
         setMessage({ type: 'success', text: '✅ Code copied to clipboard!' });
     };
 
+    // Save job directly to database
+    const handleSaveToDb = async () => {
+        if (!fullJobForm.id || !fullJobForm.title) {
+            setMessage({ type: 'error', text: 'ID and Title are required' });
+            return;
+        }
+
+        setIsLoading(true);
+        setMessage(null);
+
+        const result = await jobService.saveJob({
+            id: fullJobForm.id,
+            title: fullJobForm.title,
+            category: fullJobForm.category,
+            postDate: fullJobForm.postDate,
+            shortInfo: fullJobForm.shortInfo,
+            importantDates: fullJobForm.importantDates.filter(d => d),
+            applicationFee: fullJobForm.applicationFee.filter(f => f),
+            ageLimit: fullJobForm.ageLimit.filter(a => a),
+            vacancyDetails: fullJobForm.vacancyDetails.filter(v => v.postName),
+            importantLinks: fullJobForm.importantLinks.filter(l => l.label)
+        }, password);
+
+        setIsLoading(false);
+
+        if (result.success) {
+            setMessage({ type: 'success', text: `✅ ${result.message}` });
+            // Optionally reset form after save
+        } else {
+            setMessage({ type: 'error', text: result.message });
+        }
+    };
+
+    // Delete job from database
+    const handleDeleteFromDb = async (jobId: string) => {
+        if (!confirm(`Are you sure you want to delete "${jobId}"?`)) {
+            return;
+        }
+
+        setIsLoading(true);
+        const result = await jobService.deleteJob(jobId, password);
+        setIsLoading(false);
+
+        if (result.success) {
+            setMessage({ type: 'success', text: `🗑️ ${result.message}` });
+            resetForm();
+        } else {
+            setMessage({ type: 'error', text: result.message });
+        }
+    };
+
     // Load existing job for editing
     const loadExistingJob = (jobId: string) => {
         const job = JOB_DETAILS_DB[jobId];
@@ -751,17 +802,40 @@ ${detailsCode}
                                         <div className="flex gap-3 pt-4">
                                             <button
                                                 type="button"
-                                                onClick={generateCode}
-                                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex justify-center items-center"
+                                                onClick={handleSaveToDb}
+                                                disabled={isLoading}
+                                                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2"
                                             >
-                                                ⚡ Generate Code
+                                                {isLoading ? <Loader2 className="animate-spin" size={18} /> : '💾'}
+                                                {isEditMode ? 'Update in Database' : 'Save to Database'}
                                             </button>
+                                            {isEditMode && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteFromDb(fullJobForm.id)}
+                                                    disabled={isLoading}
+                                                    className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2"
+                                                >
+                                                    <Trash2 size={16} /> Delete
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
                                                 onClick={resetForm}
                                                 className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 rounded-lg"
                                             >
-                                                Reset
+                                                {isEditMode ? 'New' : 'Reset'}
+                                            </button>
+                                        </div>
+
+                                        {/* Generate Code (Secondary option) */}
+                                        <div className="border-t mt-4 pt-4">
+                                            <button
+                                                type="button"
+                                                onClick={generateCode}
+                                                className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 rounded-lg flex justify-center items-center gap-2 text-sm"
+                                            >
+                                                ⚡ Generate Code (for manual paste)
                                             </button>
                                         </div>
 
@@ -782,7 +856,7 @@ ${detailsCode}
                                                     {generatedCode}
                                                 </pre>
                                                 <p className="text-xs text-gray-500 mt-2">
-                                                    📋 Copy this code and paste it into <code className="bg-gray-200 px-1 rounded">constants.ts</code> inside the <code className="bg-gray-200 px-1 rounded">JOB_DETAILS_DB</code> object.
+                                                    📋 Copy this code and paste it into <code className="bg-gray-200 px-1 rounded">constants.ts</code>
                                                 </p>
                                             </div>
                                         )}

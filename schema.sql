@@ -34,6 +34,26 @@ CREATE TABLE IF NOT EXISTS job_posts (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Job Details Table - Full job details for website display
+CREATE TABLE IF NOT EXISTS job_details (
+    id TEXT PRIMARY KEY,  -- slug like 'ssc-cgl-2026'
+    title TEXT NOT NULL,
+    category TEXT DEFAULT 'Latest Jobs',
+    post_date TEXT,
+    short_info TEXT,
+    important_dates TEXT,  -- JSON array
+    application_fee TEXT,  -- JSON array
+    age_limit TEXT,        -- JSON array
+    vacancy_details TEXT,  -- JSON array of objects
+    important_links TEXT,  -- JSON array of objects
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_details_category ON job_details(category);
+CREATE INDEX IF NOT EXISTS idx_job_details_active ON job_details(is_active);
+
 -- Notification Log - Tracks sent emails
 CREATE TABLE IF NOT EXISTS notification_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
