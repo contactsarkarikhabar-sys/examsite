@@ -713,23 +713,25 @@ export default {
         }
 
         // For non-API routes, handle SPA routing:
-        // 1. Try to serve the requested asset
-        // 2. If not found (404) and it's not a file request (no extension), serve index.html
         if (env.ASSETS) {
             const response = await env.ASSETS.fetch(request);
 
-            if (response.status === 404) {
-                // simple heuristic: if the path header doesn't have a file extension, it's likely a route
-                // Exceptions: / (handled by index.html automatically usually, but good to be safe)
-                const isFile = path.split('/').pop()?.includes('.');
-                if (!isFile) {
-                    return env.ASSETS.fetch(new Request(new URL('/index.html', request.url), request));
+            // If asset not found (404) and this looks like a page navigation (GET + Accept: text/html),
+            // serve index.html to let the client-side router handle it.
+            if (response.status === 404 && request.method === 'GET') {
+                const accept = request.headers.get('Accept') || '';
+                if (accept.includes('text/html')) {
+                    const indexResponse = await env.ASSETS.fetch(new Request(new URL('/index.html', request.url), request));
+                    // Clone response to add debug header
+                    const newResponse = new Response(indexResponse.body, indexResponse);
+                    newResponse.headers.set('X-SPA-Fallback', 'true');
+                    return newResponse;
                 }
             }
 
             return response;
         }
 
-        return new Response('Not found', { status: 404 });
+        return new Response('Worker Error: Assets binding missing. Check wrangler.jsonc configuration.', { status: 500 });
     },
 };
