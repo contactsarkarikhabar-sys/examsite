@@ -21,7 +21,8 @@ const HomePage: React.FC<{
     onJobClick: (id: string, title: string) => void;
     onViewMore: (categoryTitle: string) => void;
     onAlertModalOpen: () => void;
-}> = ({ onJobClick, onViewMore, onAlertModalOpen }) => {
+    onInstallApp: () => void;
+}> = ({ onJobClick, onViewMore, onAlertModalOpen, onInstallApp }) => {
     const [sections, setSections] = useState<SectionData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +59,7 @@ const HomePage: React.FC<{
                             >
                                 <BellRing size={16} className="mr-2" /> {t.freeJobAlerts}
                             </button>
-                            <button className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-red-700 transition flex items-center">
+                            <button onClick={onInstallApp} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-red-700 transition flex items-center">
                                 <Download size={16} className="mr-2" /> {t.app}
                             </button>
                             <a href="https://t.me/Exam_site" target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-blue-700 transition flex items-center">
@@ -210,8 +211,20 @@ const CategoryPage: React.FC = () => {
 const App: React.FC = () => {
     const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const { language } = useLanguage();
+
+    // Capture PWA install prompt
+    useEffect(() => {
+        const handleBeforeInstall = (e: Event) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+        };
+        window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    }, []);
 
     // Scroll to top on route change
     useEffect(() => {
@@ -246,6 +259,22 @@ const App: React.FC = () => {
         // Search is handled in HomePage component
     };
 
+    // PWA Install handler
+    const handleInstallApp = () => {
+        if (deferredPrompt) {
+            // Show native install prompt
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
+        } else {
+            // Show instructions for iOS or already installed
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const msg = isIOS
+                ? (language === 'hi' ? 'Safari में Share बटन (⬆️) दबाएं → "Add to Home Screen" चुनें' : 'Tap Share (⬆️) in Safari → Select "Add to Home Screen"')
+                : (language === 'hi' ? 'ऐप इंस्टॉल करने के लिए: Menu (⋮) → "Install App" या "Add to Home Screen"' : 'To install: Menu (⋮) → "Install App" or "Add to Home Screen"');
+            alert(msg);
+        }
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-gray-100 font-sans">
             <Header onSearch={handleSearch} onNavigate={handleNavigate} onCategoryClick={handleViewMore} />
@@ -261,6 +290,7 @@ const App: React.FC = () => {
                                 onJobClick={handleJobClick}
                                 onViewMore={handleViewMore}
                                 onAlertModalOpen={() => setIsAlertModalOpen(true)}
+                                onInstallApp={handleInstallApp}
                             />
                         }
                     />
