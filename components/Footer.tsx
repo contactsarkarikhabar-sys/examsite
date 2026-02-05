@@ -25,7 +25,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, onCategoryClick }) => {
   };
 
   const handleDummyClick = (e: React.MouseEvent) => {
-      e.preventDefault();
+    e.preventDefault();
   }
 
   return (
@@ -52,22 +52,22 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, onCategoryClick }) => {
             <ul className="space-y-2 text-sm">
               <li><a href="#" onClick={handleDummyClick} className="hover:text-yellow-400 transition cursor-default opacity-80">{t.androidApp}</a></li>
               <li><a href="#" onClick={handleDummyClick} className="hover:text-yellow-400 transition cursor-default opacity-80">{t.iosApp}</a></li>
-              <li><a href="#" onClick={handleDummyClick} className="hover:text-yellow-400 transition cursor-default opacity-80">{t.telegramChannel}</a></li>
+              <li><a href="https://t.me/Exam_site" target="_blank" rel="noopener noreferrer" className="hover:text-yellow-400 transition">{t.telegramChannel}</a></li>
               <li><a href="#" onClick={handleDummyClick} className="hover:text-yellow-400 transition cursor-default opacity-80">{t.youtubeChannel}</a></li>
             </ul>
           </div>
           <div>
-             <h4 className="text-white text-lg font-bold mb-4">{t.legal}</h4>
-             <ul className="space-y-2 text-sm">
-               <li><a href="#" onClick={(e) => handleNavClick(e, 'privacy')} className="hover:text-yellow-400 transition">{t.privacyPolicy}</a></li>
-               <li><a href="#" onClick={(e) => handleNavClick(e, 'disclaimer')} className="hover:text-yellow-400 transition">{t.disclaimer}</a></li>
-               <li><a href="#" onClick={(e) => handleNavClick(e, 'terms')} className="hover:text-yellow-400 transition">{t.terms}</a></li>
-             </ul>
+            <h4 className="text-white text-lg font-bold mb-4">{t.legal}</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" onClick={(e) => handleNavClick(e, 'privacy')} className="hover:text-yellow-400 transition">{t.privacyPolicy}</a></li>
+              <li><a href="#" onClick={(e) => handleNavClick(e, 'disclaimer')} className="hover:text-yellow-400 transition">{t.disclaimer}</a></li>
+              <li><a href="#" onClick={(e) => handleNavClick(e, 'terms')} className="hover:text-yellow-400 transition">{t.terms}</a></li>
+            </ul>
           </div>
         </div>
         <div className="border-t border-gray-800 pt-6 text-center text-xs text-gray-500">
-           <p>&copy; {new Date().getFullYear()} ExamSite.in. {t.rightsReserved}</p>
-           <p className="mt-1">{t.demoDisclaimer}</p>
+          <p>&copy; {new Date().getFullYear()} ExamSite.in. {t.rightsReserved}</p>
+          <p className="mt-1">{t.demoDisclaimer}</p>
         </div>
       </div>
     </footer>

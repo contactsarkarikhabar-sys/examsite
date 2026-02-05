@@ -61,9 +61,9 @@ const HomePage: React.FC<{
                             <button className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-red-700 transition flex items-center">
                                 <Download size={16} className="mr-2" /> {t.app}
                             </button>
-                            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-blue-700 transition flex items-center">
+                            <a href="https://t.me/Exam_site" target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-blue-700 transition flex items-center">
                                 <Star size={16} className="mr-2" /> {t.telegram}
-                            </button>
+                            </a>
                         </div>
                     </div>
                     <Smartphone size={180} className="absolute -right-6 -bottom-10 text-gray-100 transform rotate-12 z-0 hidden md:block" />
