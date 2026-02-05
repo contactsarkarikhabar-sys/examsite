@@ -473,6 +473,45 @@ export default {
             return handleGetSubscribers(request, env);
         }
 
+        // Debug: Test email sending directly
+        if (path === '/api/test-email' && request.method === 'POST') {
+            try {
+                const body = await request.json() as { email: string };
+                const testEmail = body.email || 'test@example.com';
+
+                // Direct Resend API call for debugging
+                const response = await fetch('https://api.resend.com/emails', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        from: 'ExamSite.in <alerts@examsite.in>',
+                        to: testEmail,
+                        subject: '🧪 Test Email from ExamSite.in',
+                        html: '<h1>Test Email</h1><p>This is a test email from ExamSite.in Worker.</p>',
+                    }),
+                });
+
+                const data = await response.json();
+
+                return jsonResponse({
+                    success: response.ok,
+                    status: response.status,
+                    apiKeyPresent: !!env.RESEND_API_KEY,
+                    apiKeyLength: env.RESEND_API_KEY?.length || 0,
+                    resendResponse: data,
+                }, response.ok ? 200 : 400, origin);
+            } catch (error) {
+                return jsonResponse({
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    apiKeyPresent: !!env.RESEND_API_KEY,
+                }, 500, origin);
+            }
+        }
+
         // Health check (no sensitive info)
         if (path === '/api/health') {
             return jsonResponse({ status: 'ok' }, 200, origin);
