@@ -26,7 +26,7 @@ const StaticContent: React.FC<Props> = ({ type }) => {
       className="flex items-center text-gray-600 hover:text-red-600 transition mb-6 group"
     >
       <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
-      <span className="font-medium">{language === 'hi' ? '← होम पेज पर वापस जाएं' : '← Back to Home'}</span>
+      <span className="font-medium">{language === 'hi' ? 'होम पेज पर वापस जाएं' : 'Back to Home'}</span>
     </button>
   );
 
