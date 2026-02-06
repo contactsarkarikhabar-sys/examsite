@@ -50,18 +50,27 @@ export class AutoAgent {
 
             const { results, debug } = await this.searchSerpApi(query);
 
+            const debugInfo = {
+                ...debug,
+                apiKeys: {
+                    serp: !!this.env.SERP_API_KEY,
+                    gemini: !!this.env.GEMINI_API_KEY
+                },
+                skippedReasons: [] as string[]
+            };
+
             if (results.length === 0) {
                 return {
                     success: true,
-                    message: `No new jobs found. Debug Info: ${JSON.stringify(debug, null, 2)}`,
-                    jobsAdded: 0
+                    message: `No new jobs found.`,
+                    jobsAdded: 0,
+                    debug: debugInfo
                 };
             }
 
             // Process results
             let jobsAdded = 0;
             const uniqueResults = await this.filterExistingJobs(results);
-            const skippedReasons: string[] = [];
 
             console.log(`Found ${uniqueResults.length} unique results to analyze.`);
 
@@ -74,10 +83,10 @@ export class AutoAgent {
                         await this.saveJobToDb(job);
                         jobsAdded++;
                     } else {
-                        skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Gemini returned null)`);
+                        debugInfo.skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null, reason unknown)`);
                     }
                 } catch (e) {
-                    skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
+                    debugInfo.skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
                 }
             }
 
@@ -85,7 +94,7 @@ export class AutoAgent {
                 success: true,
                 message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
                 jobsAdded,
-                debug: { skippedReasons, totalFound: results.length }
+                debug: debugInfo
             };
 
         } catch (error) {
@@ -159,7 +168,9 @@ export class AutoAgent {
     }
 
     private async analyzeWithGemini(result: SearchResult): Promise<ParsedJob | null> {
-        if (!this.env.GEMINI_API_KEY) return null;
+        if (!this.env.GEMINI_API_KEY) {
+            throw new Error("GEMINI_API_KEY is missing in environment");
+        }
 
         const genAI = new GoogleGenerativeAI(this.env.GEMINI_API_KEY);
 
