@@ -12,6 +12,9 @@ interface Env {
     RESEND_API_KEY: string;
     ADMIN_PASSWORD: string;
     SITE_URL: string;
+    GOOGLE_SEARCH_API_KEY: string;
+    GOOGLE_SEARCH_CX: string;
+    GEMINI_API_KEY: string;
     ASSETS?: { fetch: (request: Request) => Promise<Response> };
 }
 
@@ -609,7 +612,16 @@ async function handleDeleteJob(request: Request, env: Env, jobId: string): Promi
 
 // ==================== MAIN WORKER HANDLER ====================
 
+import { AutoAgent } from './auto-agent';
+
 export default {
+    async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+        console.log('Running Automated Content Agent...');
+        const agent = new AutoAgent(env);
+        const result = await agent.run();
+        console.log('Agent Run Result:', result);
+    },
+
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
         const path = url.pathname;
