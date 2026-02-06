@@ -188,7 +188,7 @@ export class AutoAgent {
         }
 
         // try { <--- Removed try/catch
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
         const prompt = `
             Analyze this job notification to extract structured data.
