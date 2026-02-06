@@ -656,6 +656,18 @@ export default {
             return handleGetSubscribers(request, env);
         }
 
+        // Manual Agent Trigger (Admin Only)
+        if (path === '/api/admin/trigger-agent' && request.method === 'POST') {
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+
+            const agent = new AutoAgent(env);
+            const result = await agent.run();
+            return jsonResponse(result, 200, origin);
+        }
+
         // Job Details CRUD Routes
         if (path === '/api/jobs' && request.method === 'GET') {
             return handleGetAllJobs(request, env);
