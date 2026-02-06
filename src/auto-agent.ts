@@ -187,10 +187,10 @@ export class AutoAgent {
             console.warn(`Failed to fetch ${result.link}, using snippet only.`);
         }
 
-        try {
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // try { <--- Removed try/catch
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-            const prompt = `
+        const prompt = `
             Analyze this job notification to extract structured data.
             
             Source-1: Title: ${result.title}
@@ -219,49 +219,51 @@ export class AutoAgent {
             Output strictly JSON.
             `;
 
-            const resultGen = await model.generateContent(prompt);
-            const response = await resultGen.response;
-            const text = response.text();
+        const resultGen = await model.generateContent(prompt);
+        const response = await resultGen.response;
+        const text = response.text();
 
-            const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-            if (cleanText === 'null' || cleanText.toLowerCase() === 'null') {
-                // Fallback: If Gemini still returns null, create a basic entry from snippet
-                return {
-                    title: result.title,
-                    category: 'Other',
-                    shortInfo: result.snippet,
-                    importantDates: JSON.stringify([]),
-                    applicationFee: JSON.stringify([]),
-                    ageLimit: JSON.stringify([]),
-                    vacancyDetails: JSON.stringify([]),
-                    importantLinks: JSON.stringify([{ label: 'Source Link', url: result.link }]),
-                    applyLink: result.link
-                };
-            }
-
-            const data = JSON.parse(cleanText);
-
-            if (!data.title) return null;
-
-            // Normalize fields to ensure they are strings for the simple DB columns, 
-            // but for 'job_details' we can store rich JSON.
-            return {
-                title: data.title,
-                category: data.category || 'Other',
-                shortInfo: data.shortInfo || result.snippet,
-                importantDates: JSON.stringify(data.importantDates || []),
-                applicationFee: JSON.stringify(data.applicationFee || []),
-                ageLimit: JSON.stringify(data.ageLimit || []),
-                vacancyDetails: JSON.stringify(data.vacancyDetails || []),
-                importantLinks: JSON.stringify(data.importantLinks || []),
-                applyLink: data.importantLinks?.find((l: any) => l.label.includes('Apply'))?.url || result.link
+        if (cleanText === 'null' || cleanText.toLowerCase() === 'null') {
+            // Fallback: If Gemini still returns null, create a basic entry from snippet
+            const fallbackJob = {
+                title: result.title,
+                category: 'Other',
+                shortInfo: result.snippet,
+                importantDates: JSON.stringify([]),
+                applicationFee: JSON.stringify([]),
+                ageLimit: JSON.stringify([]),
+                vacancyDetails: JSON.stringify([]),
+                importantLinks: JSON.stringify([{ label: 'Source Link', url: result.link }]),
+                applyLink: result.link
             };
+            // Log fallback usage as error to see it in debug
+            throw new Error(`Gemini returned '${cleanText}', using fallback (simulated)`);
+        }
 
-        } catch (e) {
+        const data = JSON.parse(cleanText);
+
+        if (!data.title) throw new Error("Gemini returned JSON without title");
+
+        // Normalize fields to ensure they are strings for the simple DB columns, 
+        // but for 'job_details' we can store rich JSON.
+        return {
+            title: data.title,
+            category: data.category || 'Other',
+            shortInfo: data.shortInfo || result.snippet,
+            importantDates: JSON.stringify(data.importantDates || []),
+            applicationFee: JSON.stringify(data.applicationFee || []),
+            ageLimit: JSON.stringify(data.ageLimit || []),
+            vacancyDetails: JSON.stringify(data.vacancyDetails || []),
+            importantLinks: JSON.stringify(data.importantLinks || []),
+            applyLink: data.importantLinks?.find((l: any) => l.label.includes('Apply'))?.url || result.link
+        };
+
+        /* } catch (e) {
             console.error("Gemini Parse Error", e);
             return null;
-        }
+        } */
     }
 
     private async fetchPageContent(url: string): Promise<string | null> {
