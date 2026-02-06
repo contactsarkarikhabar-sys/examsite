@@ -209,9 +209,9 @@ export const jobService = {
           body: JSON.stringify(userData),
         });
 
-        const data = await response.json();
+        const data = await response.json() as { success?: boolean; message?: string; needsVerification?: boolean };
         return {
-          success: data.success,
+          success: !!data.success,
           message: data.message || 'Subscribed successfully!',
           needsVerification: data.needsVerification,
         };
@@ -262,9 +262,9 @@ export const jobService = {
         body: JSON.stringify(jobData),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { success?: boolean; message?: string; notificationsSent?: number };
       return {
-        success: data.success,
+        success: !!data.success,
         message: data.message || 'Job posted!',
         notificationsSent: data.notificationsSent,
       };
@@ -287,7 +287,7 @@ export const jobService = {
         headers: { 'Authorization': `Bearer ${adminPassword}` },
       });
 
-      const data = await response.json();
+      const data = await response.json() as { totalSubscribers?: number; verifiedSubscribers?: number };
       return {
         total: data.totalSubscribers || 0,
         verified: data.verifiedSubscribers || 0,
@@ -307,7 +307,7 @@ export const jobService = {
         headers: { 'Authorization': `Bearer ${adminPassword}` },
       });
 
-      const data = await response.json();
+      const data = await response.json() as { jobs?: { id: string; title: string; category: string }[] };
       return data.jobs || [];
     } catch (error) {
       console.error('Get all DB jobs error:', error);
@@ -347,9 +347,9 @@ export const jobService = {
         body: JSON.stringify(jobData),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { success?: boolean; message?: string };
       return {
-        success: data.success,
+        success: !!data.success,
         message: data.message || 'Job saved!',
       };
     } catch (error) {
@@ -374,9 +374,9 @@ export const jobService = {
         },
       });
 
-      const data = await response.json();
+      const data = await response.json() as { success?: boolean; message?: string };
       return {
-        success: data.success,
+        success: !!data.success,
         message: data.message || 'Job deleted!',
       };
     } catch (error) {
