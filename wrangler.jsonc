@@ -17,10 +17,7 @@
         }
     ],
     "vars": {
-        "SITE_URL": "https://examsite.in",
-        "GOOGLE_SEARCH_API_KEY": "REPLACE_WITH_YOUR_KEY",
-        "GOOGLE_SEARCH_CX": "REPLACE_WITH_YOUR_CX",
-        "GEMINI_API_KEY": "REPLACE_WITH_YOUR_KEY"
+        "SITE_URL": "https://examsite.in"
     },
     "triggers": {
         "crons": [

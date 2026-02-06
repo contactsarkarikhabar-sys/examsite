@@ -82,15 +82,26 @@ export class AutoAgent {
     }
 
     private async searchGoogle(query: string): Promise<SearchResult[]> {
+        console.log('searchGoogle called with query:', query);
+        console.log('API Key present:', !!this.env.GOOGLE_SEARCH_API_KEY);
+        console.log('CX present:', !!this.env.GOOGLE_SEARCH_CX);
+
         if (!this.env.GOOGLE_SEARCH_API_KEY || !this.env.GOOGLE_SEARCH_CX || this.env.GOOGLE_SEARCH_API_KEY.includes('REPLACE')) {
             console.warn('Google Search API Key missing or invalid.');
             return [];
         }
 
-        const url = `https://www.googleapis.com/customsearch/v1?key=${this.env.GOOGLE_SEARCH_API_KEY}&cx=${this.env.GOOGLE_SEARCH_CX}&q=${encodeURIComponent(query)}&num=2&dateRestrict=d2`; // Last 2 days
+        const url = `https://www.googleapis.com/customsearch/v1?key=${this.env.GOOGLE_SEARCH_API_KEY}&cx=${this.env.GOOGLE_SEARCH_CX}&q=${encodeURIComponent(query)}&num=5&dateRestrict=m1`; // Last 1 month, 5 results
 
+        console.log('Fetching Google Search API...');
         const response = await fetch(url);
         const data = await response.json() as any;
+
+        console.log('Google API Response status:', response.status);
+        console.log('Google API items count:', data.items?.length || 0);
+        if (data.error) {
+            console.error('Google API Error:', JSON.stringify(data.error));
+        }
 
         if (!data.items) return [];
 
