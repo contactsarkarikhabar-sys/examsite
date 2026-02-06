@@ -41,36 +41,25 @@ export class AutoAgent {
             let totalJobsAdded = 0;
             const currentYear = new Date().getFullYear();
 
-            // Strategy: Run specific targeted queries for better quality
-            const queries = [
-                `site:gov.in "recruitment" "notification" "${currentYear}" apply online`, // General Govt
-                `site:ssc.gov.in OR site:upsc.gov.in "notification" "${currentYear}"`,   // Top Commissions
-                `"railway recruitment board" "notification" "${currentYear}" site:gov.in` // Railways
-            ];
+            // Strategy: SINGLE high-quality query to prevent timeout
+            const query = `site:ssc.gov.in OR site:upsc.gov.in "recruitment" "notification" "${currentYear}"`;
 
-            // Normalize results map to avoid duplicates across queries
-            const allResults = new Map<string, SearchResult>();
+            const results = await this.searchGoogle(query);
 
-            for (const q of queries) {
-                const results = await this.searchGoogle(q);
-                results.forEach(r => allResults.set(r.link, r));
-            }
-
-            const uniqueResults = Array.from(allResults.values());
-
-            if (uniqueResults.length === 0) {
+            if (results.length === 0) {
                 return { success: true, message: 'No new jobs found from search.', jobsAdded: 0 };
             }
 
             // Filter out already existing links
-            const newResults = await this.filterExistingJobs(uniqueResults);
+            const newResults = await this.filterExistingJobs(results);
 
             if (newResults.length === 0) {
                 return { success: true, message: 'All found jobs already exist.', jobsAdded: 0 };
             }
 
-            // Process with Gemini (Limit to top 2 to manage rate limits/tokens)
-            for (const result of newResults.slice(0, 2)) {
+            // Process ONLY 1 result to guarantee passing within timeout limit
+            // We run every 4 hours, so 1 job/run = 6 jobs/day, which is plenty.
+            for (const result of newResults.slice(0, 1)) {
                 const jobData = await this.analyzeWithGemini(result);
                 if (jobData) {
                     await this.saveJobToDb(jobData);
@@ -81,8 +70,10 @@ export class AutoAgent {
             return { success: true, message: `Agent run complete. Added ${totalJobsAdded} jobs.`, jobsAdded: totalJobsAdded };
 
         } catch (error) {
+            // Log error but strict check to return JSON not crash
             console.error('AutoAgent Error:', error);
-            return { success: false, message: `Error: ${error instanceof Error ? error.message : 'Unknown'}`, jobsAdded: 0 };
+            // @ts-ignore
+            return { success: false, message: `Error: ${error.message || error}`, jobsAdded: 0 };
         }
     }
 
