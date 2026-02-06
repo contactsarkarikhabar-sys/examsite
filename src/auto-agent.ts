@@ -69,8 +69,8 @@ export class AutoAgent {
                 return { success: true, message: 'All found jobs already exist.', jobsAdded: 0 };
             }
 
-            // Process with Gemini (Apply limit to manage tokens)
-            for (const result of newResults.slice(0, 5)) {
+            // Process with Gemini (Limit to top 2 to manage rate limits/tokens)
+            for (const result of newResults.slice(0, 2)) {
                 const jobData = await this.analyzeWithGemini(result);
                 if (jobData) {
                     await this.saveJobToDb(jobData);
@@ -92,7 +92,7 @@ export class AutoAgent {
             return [];
         }
 
-        const url = `https://www.googleapis.com/customsearch/v1?key=${this.env.GOOGLE_SEARCH_API_KEY}&cx=${this.env.GOOGLE_SEARCH_CX}&q=${encodeURIComponent(query)}&num=5&dateRestrict=d2`; // Last 2 days
+        const url = `https://www.googleapis.com/customsearch/v1?key=${this.env.GOOGLE_SEARCH_API_KEY}&cx=${this.env.GOOGLE_SEARCH_CX}&q=${encodeURIComponent(query)}&num=2&dateRestrict=d2`; // Last 2 days
 
         const response = await fetch(url);
         const data = await response.json() as any;
