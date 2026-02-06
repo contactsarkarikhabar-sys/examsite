@@ -15,6 +15,7 @@ interface Env {
     GOOGLE_SEARCH_API_KEY: string;
     GOOGLE_SEARCH_CX: string;
     GEMINI_API_KEY: string;
+    SERP_API_KEY: string;
     ASSETS?: { fetch: (request: Request) => Promise<Response> };
 }
 

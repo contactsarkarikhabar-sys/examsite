@@ -5,6 +5,7 @@ interface Env {
     GOOGLE_SEARCH_API_KEY: string;
     GOOGLE_SEARCH_CX: string;
     GEMINI_API_KEY: string;
+    SERP_API_KEY: string;
 }
 
 interface SearchResult {
@@ -47,17 +48,21 @@ export class AutoAgent {
             // Strategy: Broad query to find government job notifications
             const query = `sarkari naukri ${currentYear} recruitment notification`;
 
-            const results = await this.searchGoogle(query);
+            const { results, debug } = await this.searchSerpApi(query);
 
             if (results.length === 0) {
-                return { success: true, message: 'No new jobs found from search.', jobsAdded: 0 };
+                return {
+                    success: true,
+                    message: `No new jobs found. Debug Info: ${JSON.stringify(debug, null, 2)}`,
+                    jobsAdded: 0
+                };
             }
 
             // For now, just return success with count of results found
             // This helps us test if Google Search is working
             return {
                 success: true,
-                message: `Found ${results.length} results: ${results.map(r => r.title).join(', ')}`,
+                message: `Found ${results.length} results: ${results.map(r => r.title).join(', ')}. Debug: ${JSON.stringify(debug)}`,
                 jobsAdded: 0
             };
 
@@ -68,35 +73,52 @@ export class AutoAgent {
         }
     }
 
-    private async searchGoogle(query: string): Promise<SearchResult[]> {
-        console.log('searchGoogle called with query:', query);
-        console.log('API Key present:', !!this.env.GOOGLE_SEARCH_API_KEY);
-        console.log('CX present:', !!this.env.GOOGLE_SEARCH_CX);
+    private async searchSerpApi(query: string): Promise<{ results: SearchResult[]; debug: any }> {
+        console.log('searchSerpApi called with query:', query);
 
-        if (!this.env.GOOGLE_SEARCH_API_KEY || !this.env.GOOGLE_SEARCH_CX || this.env.GOOGLE_SEARCH_API_KEY.includes('REPLACE')) {
-            console.warn('Google Search API Key missing or invalid.');
-            return [];
+        const debug = {
+            keysConfigured: {
+                serpKey: !!this.env.SERP_API_KEY && !this.env.SERP_API_KEY.includes('REPLACE')
+            },
+            query,
+            url: '',
+            status: 0,
+            dataSnippet: ''
+        };
+
+        if (!debug.keysConfigured.serpKey) {
+            console.warn('SerpAPI Key missing or invalid.');
+            return { results: [], debug: { ...debug, error: 'Missing SERP_API_KEY' } };
         }
 
-        const url = `https://www.googleapis.com/customsearch/v1?key=${this.env.GOOGLE_SEARCH_API_KEY}&cx=${this.env.GOOGLE_SEARCH_CX}&q=${encodeURIComponent(query)}&num=5&dateRestrict=m1`; // Last 1 month, 5 results
+        // SerpAPI Endpoint
+        // Engine: google, google_domain: google.co.in, gl: in (India)
+        const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${this.env.SERP_API_KEY}&num=5&google_domain=google.co.in&gl=in`;
+        debug.url = url.replace(this.env.SERP_API_KEY, 'HIDDEN_KEY');
 
-        console.log('Fetching Google Search API...');
+        console.log('Fetching SerpAPI...');
         const response = await fetch(url);
-        const data = await response.json() as any;
+        debug.status = response.status;
 
-        console.log('Google API Response status:', response.status);
-        console.log('Google API items count:', data.items?.length || 0);
+        const data = await response.json() as any;
+        debug.dataSnippet = JSON.stringify(data).substring(0, 500); // Capture start of response (error or items)
+
+        console.log('SerpAPI Response status:', response.status);
+
         if (data.error) {
-            console.error('Google API Error:', JSON.stringify(data.error));
+            console.error('SerpAPI Error:', JSON.stringify(data.error));
         }
 
-        if (!data.items) return [];
+        // SerpAPI returns results in 'organic_results'
+        if (!data.organic_results) return { results: [], debug };
 
-        return data.items.map((item: any) => ({
+        const results = data.organic_results.map((item: any) => ({
             title: item.title,
             link: item.link,
             snippet: item.snippet
         }));
+
+        return { results, debug };
     }
 
     private async filterExistingJobs(results: SearchResult[]): Promise<SearchResult[]> {
