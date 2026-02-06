@@ -183,25 +183,22 @@ export class AutoAgent {
             Analyze this job notification to extract structured data.
             
             Source-1: Title: ${result.title}
-            Source-2: ${pageContext}
             Link: ${result.link}
+            Source-2: ${pageContext}
 
             STRICTLY FOLLOW THESE RULES:
-            1. **Authenticity Check**: If this looks like a private coaching ad, answer 'null'. Only return JSON for genuine Govt/Bank/PSU jobs.
-            2. **Data Extraction**: Extract precise details. Do NOT use generic text like "See Notification" unless absolutely no data is found.
+            1. **Extraction Goal**: Extract whatever information is available. If specific details (like Fee/Dates) are missing, use "Check Notification" or "N/A".
+            2. **Do NOT return null**: Always try to return a JSON object, even if data is sparse.
             
             Return a JSON object with this exact schema:
             {
                 "title": "Clean Job Title (e.g., SSC CGL 2025 Notification)",
                 "category": "One of [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Other]",
-                "shortInfo": "A detailed 2-3 line summary of the post, vacancy count, and key highlights.",
-                "importantDates": ["Application Begin: DD/MM/YYYY", "Last Date: DD/MM/YYYY", "Exam Date: DD/MM/YYYY"], 
-                "applicationFee": ["Gen/OBC: ₹100", "SC/ST: ₹0", "Female: ₹0"],
-                "ageLimit": ["Min Age: 18 Years", "Max Age: 30 Years", "Age relaxation as per rules"],
-                "vacancyDetails": [
-                     {"postName": "Assistant", "totalPost": "500", "eligibility": "Graduate"},
-                     {"postName": "Clerk", "totalPost": "200", "eligibility": "12th Pass"}
-                ],
+                "shortInfo": "A detailed 2-3 line summary. If missing, summarize the title.",
+                "importantDates": ["Application Begin: Available Soon", "Last Date: Check Notification"], 
+                "applicationFee": ["See Notification"],
+                "ageLimit": ["See Notification"],
+                "vacancyDetails": [{"postName": "Various Posts", "totalPost": "See Notification", "eligibility": "See Notification"}],
                 "importantLinks": [
                     {"label": "Apply Online", "url": "${result.link}"},
                      {"label": "Official Website", "url": "Extract from text if available"}
@@ -217,17 +214,30 @@ export class AutoAgent {
 
             const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-            if (cleanText === 'null' || cleanText.toLowerCase() === 'null') return null;
+            if (cleanText === 'null' || cleanText.toLowerCase() === 'null') {
+                // Fallback: If Gemini still returns null, create a basic entry from snippet
+                return {
+                    title: result.title,
+                    category: 'Other',
+                    shortInfo: result.snippet,
+                    importantDates: JSON.stringify([]),
+                    applicationFee: JSON.stringify([]),
+                    ageLimit: JSON.stringify([]),
+                    vacancyDetails: JSON.stringify([]),
+                    importantLinks: JSON.stringify([{ label: 'Source Link', url: result.link }]),
+                    applyLink: result.link
+                };
+            }
 
             const data = JSON.parse(cleanText);
 
-            if (!data.title || !data.category) return null;
+            if (!data.title) return null;
 
             // Normalize fields to ensure they are strings for the simple DB columns, 
             // but for 'job_details' we can store rich JSON.
             return {
                 title: data.title,
-                category: data.category,
+                category: data.category || 'Other',
                 shortInfo: data.shortInfo || result.snippet,
                 importantDates: JSON.stringify(data.importantDates || []),
                 applicationFee: JSON.stringify(data.applicationFee || []),
