@@ -175,6 +175,7 @@ export class AutoAgent {
         const genAI = new GoogleGenerativeAI(this.env.GEMINI_API_KEY);
 
         // 1. Deep Fetch: Try to get actual page content
+        // 1. Deep Fetch: Try to get actual page content once
         let pageContext = `Snippet: ${result.snippet}`;
         try {
             console.log(`Fetching content for: ${result.link}`);
@@ -187,83 +188,92 @@ export class AutoAgent {
             console.warn(`Failed to fetch ${result.link}, using snippet only.`);
         }
 
-        // try { <--- Removed try/catch
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        // Direct REST API call to bypass SDK issues
+        const modelNames = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"];
 
-        const prompt = `
-            Analyze this job notification to extract structured data.
-            
-            Source-1: Title: ${result.title}
-            Link: ${result.link}
-            Source-2: ${pageContext}
+        let lastError: any;
 
-            STRICTLY FOLLOW THESE RULES:
-            1. **Extraction Goal**: Extract whatever information is available. If specific details (like Fee/Dates) are missing, use "Check Notification" or "N/A".
-            2. **Do NOT return null**: Always try to return a JSON object, even if data is sparse.
-            
-            Return a JSON object with this exact schema:
-            {
-                "title": "Clean Job Title (e.g., SSC CGL 2025 Notification)",
-                "category": "One of [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Other]",
-                "shortInfo": "A detailed 2-3 line summary. If missing, summarize the title.",
-                "importantDates": ["Application Begin: Available Soon", "Last Date: Check Notification"], 
-                "applicationFee": ["See Notification"],
-                "ageLimit": ["See Notification"],
-                "vacancyDetails": [{"postName": "Various Posts", "totalPost": "See Notification", "eligibility": "See Notification"}],
-                "importantLinks": [
-                    {"label": "Apply Online", "url": "${result.link}"},
-                     {"label": "Official Website", "url": "Extract from text if available"}
-                ]
+        for (const model of modelNames) {
+            try {
+                console.log(`Trying Gemini Model: ${model}`);
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.env.GEMINI_API_KEY}`;
+
+                const promptText = `
+                Analyze this job notification to extract structured data.
+                
+                Source-1: Title: ${result.title}
+                Link: ${result.link}
+                Source-2: ${pageContext}
+
+                STRICTLY FOLLOW THESE RULES:
+                1. **Extraction Goal**: Extract whatever information is available. If specific details (like Fee/Dates) are missing, use "Check Notification" or "N/A".
+                2. **Do NOT return null**: Always try to return a JSON object, even if data is sparse.
+                
+                Return a JSON object with this exact schema:
+                {
+                    "title": "Clean Job Title (e.g., SSC CGL 2025 Notification)",
+                    "category": "One of [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Other]",
+                    "shortInfo": "A detailed 2-3 line summary. If missing, summarize the title.",
+                    "importantDates": ["Application Begin: Available Soon", "Last Date: Check Notification"], 
+                    "applicationFee": ["See Notification"],
+                    "ageLimit": ["See Notification"],
+                    "vacancyDetails": [{"postName": "Various Posts", "totalPost": "See Notification", "eligibility": "See Notification"}],
+                    "importantLinks": [
+                        {"label": "Apply Online", "url": "${result.link}"},
+                        {"label": "Official Website", "url": "Extract from text if available"}
+                    ]
+                }
+                `;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: promptText }]
+                        }],
+                        generationConfig: {
+                            response_mime_type: "application/json"
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error (${model}) ${response.status}: ${errorText}`);
+                }
+
+                const data: any = await response.json();
+                const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!rawText) throw new Error("Empty response from Gemini");
+
+                const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanText);
+
+                if (!parsed.title) throw new Error("Gemini returned JSON without title");
+
+                return {
+                    title: parsed.title,
+                    category: parsed.category || 'Other',
+                    shortInfo: parsed.shortInfo || result.snippet,
+                    importantDates: JSON.stringify(parsed.importantDates || []),
+                    applicationFee: JSON.stringify(parsed.applicationFee || []),
+                    ageLimit: JSON.stringify(parsed.ageLimit || []),
+                    vacancyDetails: JSON.stringify(parsed.vacancyDetails || []),
+                    importantLinks: JSON.stringify(parsed.importantLinks || []),
+                    applyLink: parsed.importantLinks?.find((l: any) => l.label.includes('Apply'))?.url || result.link
+                };
+
+            } catch (e) {
+                console.warn(`Model ${model} failed:`, e);
+                lastError = e;
+                // Try next model
             }
-
-            Output strictly JSON.
-            `;
-
-        const resultGen = await model.generateContent(prompt);
-        const response = await resultGen.response;
-        const text = response.text();
-
-        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        if (cleanText === 'null' || cleanText.toLowerCase() === 'null') {
-            // Fallback: If Gemini still returns null, create a basic entry from snippet
-            const fallbackJob = {
-                title: result.title,
-                category: 'Other',
-                shortInfo: result.snippet,
-                importantDates: JSON.stringify([]),
-                applicationFee: JSON.stringify([]),
-                ageLimit: JSON.stringify([]),
-                vacancyDetails: JSON.stringify([]),
-                importantLinks: JSON.stringify([{ label: 'Source Link', url: result.link }]),
-                applyLink: result.link
-            };
-            // Log fallback usage as error to see it in debug
-            throw new Error(`Gemini returned '${cleanText}', using fallback (simulated)`);
         }
 
-        const data = JSON.parse(cleanText);
-
-        if (!data.title) throw new Error("Gemini returned JSON without title");
-
-        // Normalize fields to ensure they are strings for the simple DB columns, 
-        // but for 'job_details' we can store rich JSON.
-        return {
-            title: data.title,
-            category: data.category || 'Other',
-            shortInfo: data.shortInfo || result.snippet,
-            importantDates: JSON.stringify(data.importantDates || []),
-            applicationFee: JSON.stringify(data.applicationFee || []),
-            ageLimit: JSON.stringify(data.ageLimit || []),
-            vacancyDetails: JSON.stringify(data.vacancyDetails || []),
-            importantLinks: JSON.stringify(data.importantLinks || []),
-            applyLink: data.importantLinks?.find((l: any) => l.label.includes('Apply'))?.url || result.link
-        };
-
-        /* } catch (e) {
-            console.error("Gemini Parse Error", e);
-            return null;
-        } */
+        // If all models fail, throw the last error to be caught by the outer loop and logged
+        throw lastError || new Error("All Gemini models failed");
     }
 
     private async fetchPageContent(url: string): Promise<string | null> {
