@@ -42,11 +42,10 @@ export class AutoAgent {
     async run(): Promise<{ success: boolean; message: string; jobsAdded: number }> {
         try {
             console.log('Starting AutoAgent run...');
-            let totalJobsAdded = 0;
             const currentYear = new Date().getFullYear();
 
-            // Strategy: SINGLE high-quality query to prevent timeout
-            const query = `site:ssc.gov.in OR site:upsc.gov.in "recruitment" "notification" "${currentYear}"`;
+            // Strategy: Broad query to find government job notifications
+            const query = `sarkari naukri ${currentYear} recruitment notification`;
 
             const results = await this.searchGoogle(query);
 
@@ -54,30 +53,18 @@ export class AutoAgent {
                 return { success: true, message: 'No new jobs found from search.', jobsAdded: 0 };
             }
 
-            // Filter out already existing links
-            const newResults = await this.filterExistingJobs(results);
-
-            if (newResults.length === 0) {
-                return { success: true, message: 'All found jobs already exist.', jobsAdded: 0 };
-            }
-
-            // Process ONLY 1 result to guarantee passing within timeout limit
-            // We run every 4 hours, so 1 job/run = 6 jobs/day, which is plenty.
-            for (const result of newResults.slice(0, 1)) {
-                const jobData = await this.analyzeWithGemini(result);
-                if (jobData) {
-                    await this.saveJobToDb(jobData);
-                    totalJobsAdded++;
-                }
-            }
-
-            return { success: true, message: `Agent run complete. Added ${totalJobsAdded} jobs.`, jobsAdded: totalJobsAdded };
+            // For now, just return success with count of results found
+            // This helps us test if Google Search is working
+            return {
+                success: true,
+                message: `Found ${results.length} results: ${results.map(r => r.title).join(', ')}`,
+                jobsAdded: 0
+            };
 
         } catch (error) {
             // Log error but strict check to return JSON not crash
             console.error('AutoAgent Error:', error);
-            // @ts-ignore
-            return { success: false, message: `Error: ${error.message || error}`, jobsAdded: 0 };
+            return { success: false, message: `Error: ${(error as Error).message || error}`, jobsAdded: 0 };
         }
     }
 

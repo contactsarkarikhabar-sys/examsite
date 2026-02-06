@@ -659,13 +659,28 @@ export default {
         // Manual Agent Trigger (Admin Only)
         if (path === '/api/admin/trigger-agent' && request.method === 'POST') {
             const authHeader = request.headers.get('Authorization');
+
+            // Check if ADMIN_PASSWORD is set
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+
             if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
                 return errorResponse('Unauthorized', 401, origin);
             }
 
-            const agent = new AutoAgent(env);
-            const result = await agent.run();
-            return jsonResponse(result, 200, origin);
+            try {
+                const agent = new AutoAgent(env);
+                const result = await agent.run();
+                return jsonResponse(result, 200, origin);
+            } catch (error) {
+                console.error('Agent execution error:', error);
+                return jsonResponse({
+                    success: false,
+                    message: `Agent Error: ${error instanceof Error ? error.message : String(error)}`,
+                    jobsAdded: 0
+                }, 500, origin);
+            }
         }
 
         // Job Details CRUD Routes
