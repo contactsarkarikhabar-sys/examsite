@@ -189,7 +189,7 @@ const CategoryPage: React.FC = () => {
     }, [categoryName]);
 
     const handleJobClick = (id: string, title: string) => {
-        navigate(`/job/${encodeURIComponent(title)}`);
+        navigate(`/job/${encodeURIComponent(id)}`);
     };
 
     if (isLoading) {
@@ -245,7 +245,7 @@ const App: React.FC = () => {
     };
 
     const handleJobClick = (id: string, title: string) => {
-        navigate(`/job/${encodeURIComponent(title)}`);
+        navigate(`/job/${encodeURIComponent(id)}`);
     };
 
     const handleViewMore = (categoryTitle: string) => {
