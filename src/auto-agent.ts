@@ -58,12 +58,26 @@ export class AutoAgent {
                 };
             }
 
-            // For now, just return success with count of results found
-            // This helps us test if Google Search is working
+            // Process results
+            let jobsAdded = 0;
+            const uniqueResults = await this.filterExistingJobs(results);
+
+            console.log(`Found ${uniqueResults.length} unique results to analyze.`);
+
+            for (const result of uniqueResults) {
+                console.log(`Analyzing: ${result.title}`);
+                const job = await this.analyzeWithGemini(result);
+                if (job) {
+                    console.log(`Saving job: ${job.title}`);
+                    await this.saveJobToDb(job);
+                    jobsAdded++;
+                }
+            }
+
             return {
                 success: true,
-                message: `Found ${results.length} results: ${results.map(r => r.title).join(', ')}. Debug: ${JSON.stringify(debug)}`,
-                jobsAdded: 0
+                message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
+                jobsAdded
             };
 
         } catch (error) {
