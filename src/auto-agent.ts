@@ -40,13 +40,13 @@ export class AutoAgent {
         this.env = env;
     }
 
-    async run(): Promise<{ success: boolean; message: string; jobsAdded: number }> {
+    async run(): Promise<{ success: boolean; message: string; jobsAdded: number; debug?: any }> {
         try {
             console.log('Starting AutoAgent run...');
             const currentYear = new Date().getFullYear();
 
-            // Strategy: Broad query to find government job notifications
-            const query = `sarkari naukri ${currentYear} recruitment notification`;
+            // Strategy: Specific query for official government notifications
+            const query = `site:gov.in recruitment notification 2026`;
 
             const { results, debug } = await this.searchSerpApi(query);
 
@@ -61,23 +61,31 @@ export class AutoAgent {
             // Process results
             let jobsAdded = 0;
             const uniqueResults = await this.filterExistingJobs(results);
+            const skippedReasons: string[] = [];
 
             console.log(`Found ${uniqueResults.length} unique results to analyze.`);
 
             for (const result of uniqueResults) {
                 console.log(`Analyzing: ${result.title}`);
-                const job = await this.analyzeWithGemini(result);
-                if (job) {
-                    console.log(`Saving job: ${job.title}`);
-                    await this.saveJobToDb(job);
-                    jobsAdded++;
+                try {
+                    const job = await this.analyzeWithGemini(result);
+                    if (job) {
+                        console.log(`Saving job: ${job.title}`);
+                        await this.saveJobToDb(job);
+                        jobsAdded++;
+                    } else {
+                        skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Gemini returned null)`);
+                    }
+                } catch (e) {
+                    skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
                 }
             }
 
             return {
                 success: true,
                 message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
-                jobsAdded
+                jobsAdded,
+                debug: { skippedReasons, totalFound: results.length }
             };
 
         } catch (error) {
