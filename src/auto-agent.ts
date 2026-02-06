@@ -172,9 +172,22 @@ export class AutoAgent {
             throw new Error("GEMINI_API_KEY is missing in environment");
         }
 
-        const genAI = new GoogleGenerativeAI(this.env.GEMINI_API_KEY);
+        // 1. Dynamically fetch available models to avoid 404s
+        let targetModel = 'gemini-1.5-flash'; // Default fallback
+        try {
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.env.GEMINI_API_KEY}`;
+            const response = await fetch(listUrl);
+            if (response.ok) {
+                const data = await response.json() as any;
+                const models = data.models.map((m: any) => m.name.split('/')[1]);
+                if (models.includes('gemini-1.5-pro')) {
+                    targetModel = 'gemini-1.5-pro';
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to fetch Gemini model list, using default:', targetModel, e);
+        }
 
-        // 1. Deep Fetch: Try to get actual page content
         // 1. Deep Fetch: Try to get actual page content once
         let pageContext = `Snippet: ${result.snippet}`;
         try {
