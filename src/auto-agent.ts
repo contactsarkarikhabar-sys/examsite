@@ -40,6 +40,33 @@ export class AutoAgent {
         this.env = env;
     }
 
+    private isTrustedDomain(urlStr: string): boolean {
+        try {
+            const host = new URL(urlStr).hostname;
+            if (!host) return false;
+            if (/\.(gov\.in|nic\.in)$/.test(host)) return true;
+            return this.TRUSTED_SITES.some(s => host.endsWith(s));
+        } catch {
+            return false;
+        }
+    }
+
+    private isClaritySufficient(job: ParsedJob): boolean {
+        const title = (job.title || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+        const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+        const titleLen = title.length;
+        const infoLen = info.length;
+        const genericHead = /^(recruitment|vacancies|vacancy notification|notification|news and notification|recruitment\/engagement|online form|vacancy\s*(?:&|and)\s*online form)\b/i.test((job.title || '').toLowerCase());
+        const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice',
+            'uppsc','upsssc','rpsc','rsmssb','mppsc','bpsc','wbpsc','jkpsc','jpsc','mpsc','kpsc','gpsc','hpsc','hppsc','opsc','tnpsc','tspsc','appsc','ossc','hssc','uksssc','bssc','dsssb','psssb','jssc','cgpsc','mpesb'
+        ];
+        const hasKeyword = keywords.some(k => title.includes(k) || info.includes(k));
+        const domainOk = this.isTrustedDomain(job.applyLink);
+        const hasLink = !!(job.applyLink && job.applyLink.trim().length > 0);
+        const actionOnly = /^(online form|online application status|vacancy\s*(?:&|and)\s*online form|vacancy)$/i.test(title);
+        return (!genericHead && !actionOnly && (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk)) && hasLink;
+    }
+
     async run(): Promise<{ success: boolean; message: string; jobsAdded: number; debug?: any }> {
         try {
             console.log('Starting AutoAgent run...');
@@ -71,9 +98,13 @@ export class AutoAgent {
                 try {
                     const job = await this.analyzeWithGemini(result);
                     if (job) {
-                        console.log(`Saving job: ${job.title}`);
-                        await this.saveJobToDb(job);
-                        jobsAdded++;
+                        if (this.isClaritySufficient(job)) {
+                            console.log(`Saving job: ${job.title}`);
+                            await this.saveJobToDb(job);
+                            jobsAdded++;
+                        } else {
+                            skippedReasons.push(`Unclear: ${job.title.substring(0, 40)}... from ${result.link}`);
+                        }
                     } else {
                         skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null)`);
                     }
@@ -258,24 +289,73 @@ export class AutoAgent {
             // Normalize fields to ensure strings for DB
             const sanitizeUrl = (u: string) => (u || '').replace(/`/g, '').trim();
             const makeReadableTitle = (rawTitle: string, shortInfo: string, link: string) => {
-                const base = (rawTitle || '').trim()
+                const cleanedBase = (rawTitle || '').trim()
                     .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
+                    .replace(/https?:\/\/\S+/ig, '')
                     .replace(/\s*\|\s*/g, ' ')
                     .replace(/\s{2,}/g, ' ')
                     .trim();
-                const firstInfo = (shortInfo || '').split(/[\n\.]/)[0].replace(/\s{2,}/g, ' ').trim();
-                if (firstInfo && firstInfo.length > 10) {
-                    return base ? `${firstInfo} — ${base}` : firstInfo;
-                }
-                try {
-                    const host = new URL(link).hostname;
-                    const org = (host.split('.').filter(Boolean)[0] || '').replace(/-/g, ' ');
-                    const orgCap = org ? org.charAt(0).toUpperCase() + org.slice(1) : '';
-                    if (orgCap && !/recruitment/i.test(base)) {
-                        return base ? `${base} — ${orgCap}` : orgCap;
+                const lowerAll = (cleanedBase + ' ' + (shortInfo || '')).toLowerCase();
+                const yearMatch = (cleanedBase.match(/20\d{2}/) || (shortInfo || '').match(/20\d{2}/));
+                const year = yearMatch ? yearMatch[0] : '';
+                const patterns: Array<{ re: RegExp; name: string }> = [
+                    { re: /\brrb\s*je\b/i, name: 'Railway RRB JE' },
+                    { re: /\brrb\s*group\s*d\b/i, name: 'Railway RRB Group D' },
+                    { re: /\brrb\s*alp\b/i, name: 'Railway RRB ALP' },
+                    { re: /\bssc\s*cgl\b/i, name: 'SSC CGL' },
+                    { re: /\bssc\s*chsl\b/i, name: 'SSC CHSL' },
+                    { re: /\bssc\s*mts\b/i, name: 'SSC MTS' },
+                    { re: /\buppsc\b/i, name: 'UPPSC' },
+                    { re: /\bupsssc\b/i, name: 'UPSSSC' },
+                    { re: /\bnhm\s+maharashtra\b/i, name: 'NHM Maharashtra' },
+                    { re: /\b(tshc|telangana\s+high\s+court)\b/i, name: 'Telangana High Court' },
+                    { re: /\bpsssb\b/i, name: 'Punjab SSSB' },
+                    { re: /\brpsc\b/i, name: 'RPSC' },
+                    { re: /\brsmssb|rssb\b/i, name: 'RSMSSB' },
+                    { re: /\bmppsc\b/i, name: 'MPPSC' },
+                    { re: /\bbpsc\b/i, name: 'BPSC' },
+                    { re: /\bwbpsc\b/i, name: 'WBPSC' },
+                    { re: /\bjkpsc\b/i, name: 'JKPSC' },
+                    { re: /\bjpsc\b/i, name: 'JPSC' },
+                    { re: /\bmpsc\b/i, name: 'MPSC' },
+                    { re: /\bgpsc\b/i, name: 'GPSC' }
+                ];
+                let exam = '';
+                for (const p of patterns) {
+                    if (p.re.test(cleanedBase) || p.re.test(shortInfo || '')) {
+                        exam = p.name;
+                        break;
                     }
-                } catch {}
-                return base || rawTitle;
+                }
+                if (!exam) {
+                    try {
+                        const host = new URL(link).hostname;
+                        if (/sssb\.punjab\.gov\.in$/i.test(host)) exam = 'Punjab SSSB';
+                        else if (/rpsc\.rajasthan\.gov\.in$/i.test(host)) exam = 'RPSC';
+                        else if (/upsssc\.gov\.in$/i.test(host)) exam = 'UPSSSC';
+                        else if (/uppsc\.up\.nic\.in$/i.test(host)) exam = 'UPPSC';
+                        else if (/esb\.mp\.gov\.in$/i.test(host)) exam = 'MPESB';
+                    } catch {}
+                }
+                let action = 'Online Form';
+                const t = cleanedBase.toLowerCase();
+                if (t.includes('admit card') || t.includes('hall ticket') || t.includes('call letter')) {
+                    action = 'Admit Card';
+                } else if (t.includes('answer key')) {
+                    action = 'Answer Key';
+                } else if (t.includes('syllabus') || t.includes('pattern')) {
+                    action = 'Syllabus';
+                } else if (t.includes('result')) {
+                    action = 'Result';
+                } else if (t.includes('status')) {
+                    action = 'Online Application Status';
+                } else if (t.includes('counselling') || t.includes('admission')) {
+                    action = 'Admission';
+                }
+                if (/application\s+status|status\s+check/i.test(lowerAll)) {
+                    action = 'Online Application Status';
+                }
+                return `${(exam || cleanedBase).trim()}${year ? ' ' + year : ''} ${action}`.replace(/\s{2,}/g, ' ').trim();
             };
             const links = Array.isArray(parsed.importantLinks)
                 ? parsed.importantLinks.map((l: any) => ({
