@@ -461,7 +461,19 @@ interface JobDetailRequest {
 async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
     try {
-        const jobs = await env.DB.prepare('SELECT * FROM job_details WHERE is_active = 1 ORDER BY updated_at DESC')
+        const jobs = await env.DB.prepare(`
+            SELECT * FROM job_details
+            WHERE is_active = 1
+              AND title NOT LIKE '%http%'
+              AND title NOT LIKE '%www.%'
+              AND title NOT LIKE 'Vacancy%'
+              AND title NOT LIKE 'Engagement%'
+              AND title NOT LIKE 'Recruitment%'
+              AND title NOT LIKE 'Notification%'
+              AND title NOT LIKE '%DATED%'
+              AND title NOT LIKE 'No.%'
+            ORDER BY updated_at DESC
+        `)
             .all();
 
         const parsedJobs = (jobs.results || [])
