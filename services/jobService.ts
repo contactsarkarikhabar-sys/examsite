@@ -281,14 +281,25 @@ export const jobService = {
     if (!query.trim()) return allSections;
 
     const lowerQuery = query.toLowerCase();
+    const tokens = lowerQuery
+      .replace(/[^\w\s/.-]/g, ' ')
+      .split(/\s+/)
+      .filter(t => t.length > 1 && !['declared'].includes(t));
 
-    return allSections.map(section => ({
-      ...section,
-      items: section.items.filter(item =>
-        item.title.toLowerCase().includes(lowerQuery) ||
-        section.title.toLowerCase().includes(lowerQuery)
-      )
-    })).filter(section => section.items.length > 0);
+    const filtered = allSections.map(section => {
+      const sectionTitle = section.title.toLowerCase();
+      const items = section.items.filter(item => {
+        const title = item.title.toLowerCase();
+        const direct = title.includes(lowerQuery) || sectionTitle.includes(lowerQuery);
+        if (direct) return true;
+        if (tokens.length === 0) return false;
+        const matchCount = tokens.reduce((acc, tok) => acc + (title.includes(tok) ? 1 : 0), 0);
+        return matchCount >= Math.min(2, tokens.length);
+      });
+      return { ...section, items };
+    }).filter(section => section.items.length > 0);
+
+    return filtered.length > 0 ? filtered : allSections;
   },
 
   // Get Detailed Job Info
