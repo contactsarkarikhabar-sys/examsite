@@ -252,6 +252,7 @@ const App: React.FC = () => {
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sections, setSections] = useState<SectionData[]>([]);
     const navigate = useNavigate();
     const location = useLocation();
     const { language } = useLanguage();
@@ -270,6 +271,20 @@ const App: React.FC = () => {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [location.pathname]);
+
+    useEffect(() => {
+        const loadSections = async () => {
+            const query = searchQuery.trim();
+            if (query) {
+                const filtered = await jobService.searchJobs(query);
+                setSections(filtered);
+                return;
+            }
+            const data = await jobService.getAllJobs();
+            setSections(data);
+        };
+        loadSections();
+    }, [searchQuery]);
 
     // Navigation handlers
     const handleNavigate = (view: ViewType) => {
