@@ -23,7 +23,8 @@ const HomePage: React.FC<{
     onViewMore: (categoryTitle: string) => void;
     onAlertModalOpen: () => void;
     onInstallApp: () => void;
-}> = ({ searchQuery, onJobClick, onViewMore, onAlertModalOpen, onInstallApp }) => {
+    onClearSearch: () => void;
+}> = ({ searchQuery, onJobClick, onViewMore, onAlertModalOpen, onInstallApp, onClearSearch }) => {
     const [sections, setSections] = useState<SectionData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { language } = useLanguage();
@@ -137,7 +138,19 @@ const HomePage: React.FC<{
             {!isLoading && sections.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                     <Frown size={64} className="mb-4 text-gray-300" />
-                    <h3 className="text-xl font-bold text-gray-700">{t.noJobsFound}</h3>
+                    <h3 className="text-xl font-bold text-gray-700">
+                        {searchQuery?.trim()
+                            ? `${t.noMatching} "${searchQuery}"`
+                            : t.noJobsFound}
+                    </h3>
+                    {searchQuery?.trim() && (
+                        <button
+                            onClick={onClearSearch}
+                            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow hover:bg-red-700 transition"
+                        >
+                            {t.clearSearch}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -327,6 +340,7 @@ const App: React.FC = () => {
                                 onViewMore={handleViewMore}
                                 onAlertModalOpen={() => setIsAlertModalOpen(true)}
                                 onInstallApp={handleInstallApp}
+                                onClearSearch={() => setSearchQuery('')}
                             />
                         }
                     />
@@ -354,6 +368,7 @@ const App: React.FC = () => {
                                 onViewMore={handleViewMore}
                                 onAlertModalOpen={() => setIsAlertModalOpen(true)}
                                 onInstallApp={handleInstallApp}
+                                onClearSearch={() => setSearchQuery('')}
                             />
                         }
                     />
