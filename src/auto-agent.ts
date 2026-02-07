@@ -50,8 +50,6 @@ export class AutoAgent {
 
             const { results, debug } = await this.searchSerpApi(query);
 
-            const { results, debug } = await this.searchSerpApi(query);
-
             if (results.length === 0) {
                 return {
                     success: true,
@@ -90,10 +88,7 @@ export class AutoAgent {
                 message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
                 jobsAdded,
                 debug: {
-                    query: serpDebug.query,
-                    url: serpDebug.url,
-                    status: serpDebug.status,
-                    dataSnippet: serpDebug.dataSnippet,
+                    ...debug,
                     uniqueResults: uniqueResults.length,
                     skippedReasons
                 }
