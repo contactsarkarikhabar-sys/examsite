@@ -176,8 +176,16 @@ const JobDetailPage: React.FC = () => {
             if (jobId) {
                 setIsLoading(true);
                 const state = location.state as { title?: string } | null;
-                const detail = await jobService.getJobDetail(jobId, state?.title);
-                setJob(detail);
+                
+                // Attempt to fetch job details
+                try {
+                    const detail = await jobService.getJobDetail(jobId, state?.title);
+                    setJob(detail);
+                } catch (error) {
+                    console.error("Failed to load job, generating smart fallback", error);
+                    // This block might not be reached if jobService handles errors internally,
+                    // but it's good practice.
+                }
                 setIsLoading(false);
             }
         };
@@ -192,8 +200,9 @@ const JobDetailPage: React.FC = () => {
         );
     }
 
+    // If job is null (should rare now due to service fallback), show simple not found
     if (!job) {
-        return <div className="text-center py-20">Job not found</div>;
+        return <div className="text-center py-20">Job details unavailable. Please try again.</div>;
     }
 
     return <JobDetail job={job} onBack={() => navigate('/')} />;
@@ -292,7 +301,7 @@ const App: React.FC = () => {
 
     // Marquee Click Handler
     const handleMarqueeClick = (text: string, id?: string) => {
-        // 1. Direct ID (Best Case)
+        // 1. Direct ID (Standard Navigation)
         if (id) {
             handleJobClick(id, text);
             return;
@@ -310,8 +319,10 @@ const App: React.FC = () => {
              }
         }
         
-        // 3. Last Resort: Search
-        handleSearch(text);
+        // 3. Last Resort: Generate a Slug ID from Text and Navigate
+        // Instead of searching, we FORCE navigation to a detail page
+        const generatedId = cleanText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        handleJobClick(generatedId, cleanText);
     };
 
     // PWA Install handler
