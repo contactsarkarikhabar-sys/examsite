@@ -64,6 +64,25 @@ const deriveReadableTitle = (job: JobDetailData): string => {
   return rawTitle;
 };
 
+const isDisplayableJob = (job: JobDetailData): boolean => {
+  const rawTitle = (job.title || '');
+  const title = rawTitle.toLowerCase().replace(/\s{2,}/g, ' ').trim();
+  const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+  const titleLen = title.length;
+  const infoLen = info.length;
+  const genericHead = /^(recruitment|vacancies|vacancy notification|notification|news and notification|recruitment\/engagement)\b/i.test(rawTitle);
+  const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice'];
+  const hasKeyword = keywords.some(k => title.includes(k) || info.includes(k));
+  let domainOk = false;
+  try {
+    const url = job.importantLinks?.[0]?.url || '';
+    const host = url ? new URL(url).hostname : '';
+    domainOk = /\.(gov\.in|nic\.in)$/.test(host) || /upsc\.gov\.in|ssc\.gov\.in|ibps\.in|sbi\.co\.in|rbi\.org\.in/.test(host);
+  } catch {}
+  const hasLink = !!(job.importantLinks?.[0]?.url);
+  return (!genericHead && (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk)) && hasLink;
+};
+
 // Initial Sections Structure (Clone from MOCK to keep colors/order AND items)
 const getInitialSections = (): SectionData[] => {
   // Deep copy to avoid mutating the original constant if we modify it later
@@ -101,6 +120,9 @@ export const jobService = {
           const newUpdatesItems: JobLink[] = [];
 
           jobs.forEach(job => {
+            if (!isDisplayableJob(job)) {
+              return;
+            }
             // Create Link Item
             const linkItem: JobLink = {
               id: job.id,
