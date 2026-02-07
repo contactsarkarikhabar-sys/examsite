@@ -66,7 +66,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate, onCategoryClick }) => {
           </div>
         </div>
         <div className="border-t border-gray-800 pt-6 text-center text-xs text-gray-500">
-          <p>&copy; {new Date().getFullYear()} ExamSite.in. {t.rightsReserved}</p>
+          <p>&copy; {new Date().getFullYear()} ExamSite.in. {t.rightsReserved} <span className="opacity-50 ml-2">v1.2</span></p>
           <p className="mt-1">{t.demoDisclaimer}</p>
         </div>
       </div>
