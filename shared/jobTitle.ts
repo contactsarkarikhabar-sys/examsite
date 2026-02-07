@@ -53,7 +53,8 @@ export const stripGenericHeadPrefix = (rawTitle: string): string => {
 export const isActionOnlyTitle = (title: string): boolean => {
     const normalized = normalizeSpaces(String(title || ''));
     const withoutYear = normalizeSpaces(normalized.replace(/\b20\d{2}\b/g, ' '));
-    return ACTION_ONLY_RE.test(withoutYear);
+    const withoutParens = normalizeSpaces(withoutYear.replace(/[()]/g, ' '));
+    return ACTION_ONLY_RE.test(withoutParens);
 };
 
 export const deriveReadableTitle = (job: JobTitleLike): string => {
@@ -170,7 +171,7 @@ export const deriveReadableTitle = (job: JobTitleLike): string => {
     }
 
     const examName = normalizeSpaces(exam || cleanedForExamGuess || cleanedBase);
-    const composed = normalizeSpaces(`${examName} ${year} ${action}`)
+    const composed = normalizeSpaces(`${examName} ${year} (${action})`)
         .replace(
             /\b(recruitments?|recruitment\/engagement|news and notification|notifications?|vacancies?|vacancy notification|notification|advertisement|declared)\b/ig,
             ' '
