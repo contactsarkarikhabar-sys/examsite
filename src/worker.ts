@@ -694,6 +694,37 @@ export default {
             }
         }
 
+        if (path === '/api/admin/migrate' && request.method === 'POST') {
+            const url = new URL(request.url);
+            const queryKey = url.searchParams.get('key');
+            const authHeader = request.headers.get('Authorization');
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized. Use ?key=YOUR_ADMIN_PASSWORD', 401, origin);
+            }
+            try {
+                const info = await env.DB.prepare('PRAGMA table_info(job_details)').all();
+                const hasApplyLink = (info.results || []).some((r: any) => r.name === 'apply_link');
+                let applied = false;
+                if (!hasApplyLink) {
+                    await env.DB.prepare('ALTER TABLE job_details ADD COLUMN apply_link TEXT').run();
+                    applied = true;
+                }
+                return jsonResponse({ success: true, applied }, 200, origin);
+            } catch (error) {
+                console.error('Migration error:', error);
+                return errorResponse('Migration failed', 500, origin);
+            }
+        }
+
         // Job Details CRUD Routes
         if (path === '/api/jobs' && request.method === 'GET') {
             return handleGetAllJobs(request, env);
