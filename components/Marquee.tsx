@@ -4,6 +4,7 @@ import { MOCK_SECTIONS } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../utils/translations';
 import { SectionData } from '../types';
+import { deriveReadableTitle } from '../shared/jobTitle';
 
 interface MarqueeProps {
   onItemClick?: (text: string, id?: string) => void;
@@ -25,7 +26,7 @@ const Marquee: React.FC<MarqueeProps> = ({ onItemClick, sections = [] }) => {
         ...newUpdates.slice(0, 6),
         ...topOnline.slice(0, 4)
     ].map(item => ({
-        text: item.title + (item.isNew ? ' 🔴' : ''), 
+        text: deriveReadableTitle({ title: item.title }) + (item.isNew ? ' 🔴' : ''), 
         id: item.id
     }));
 

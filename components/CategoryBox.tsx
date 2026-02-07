@@ -3,6 +3,7 @@ import { SectionData, JobLink } from '../types';
 import { ExternalLink, ChevronsRight } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations, translateSectionTitle } from '../utils/translations';
+import { deriveReadableTitle } from '../shared/jobTitle';
 
 interface Props {
   data: SectionData;
@@ -55,7 +56,7 @@ const CategoryBox: React.FC<Props> = ({ data, onJobClick, onViewMore }) => {
   const handleClick = (e: React.MouseEvent, item: JobLink) => {
       if (onJobClick) {
           e.preventDefault();
-          onJobClick(item.id, item.title);
+          onJobClick(item.id, deriveReadableTitle({ title: item.title }));
       }
   };
 
@@ -87,7 +88,7 @@ const CategoryBox: React.FC<Props> = ({ data, onJobClick, onViewMore }) => {
             >
                <ChevronsRight size={14} className={`mr-1.5 mt-0.5 flex-shrink-0 text-gray-400 group-hover:${hoverClass.replace('text-', 'text-opacity-100 text-')}`} />
                <span className="leading-snug">
-                {item.title}
+                {deriveReadableTitle({ title: item.title })}
                 {item.isNew && (
                   <span className="inline-block ml-2 px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded animate-pulse">
                     {t.new}

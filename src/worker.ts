@@ -5,7 +5,7 @@
 
 import { EmailService } from './email-service';
 import { emailTemplates } from './email-templates';
-import { deriveReadableTitle } from '../shared/jobTitle';
+import { deriveReadableTitle, isDisplayableJob } from '../shared/jobTitle';
 
 // Types
 interface Env {
@@ -501,7 +501,7 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
                 importantLinks,
                 applyLink
             };
-        });
+        }).filter((job: any) => isDisplayableJob(job));
 
         return jsonResponse({ success: true, jobs: parsedJobs, count: parsedJobs.length }, 200, origin);
     } catch (error) {

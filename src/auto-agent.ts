@@ -43,7 +43,7 @@ export class AutoAgent {
         const genericHead = isGenericHeadTitle(rawTitle);
         const strippedTitle = stripGenericHeadPrefix(rawTitle);
         const genericHeadBad = genericHead && strippedTitle.length < 12;
-        const looksLikeUrl = /^https?:\/\//i.test(rawTitle) || /https?:\/\//i.test(info);
+        const looksLikeUrl = /https?:\/\//i.test(rawTitle) || /https?:\/\//i.test(info) || /\bwww\./i.test(rawTitle) || /\bwww\./i.test(info);
         const hasQueryNoise = /(\bkey=|utm_|ref=)/i.test(rawTitle) || /(\bkey=|utm_|ref=)/i.test(info);
         const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice',
             'uppsc','upsssc','rpsc','rsmssb','mppsc','bpsc','wbpsc','jkpsc','jpsc','mpsc','kpsc','gpsc','hpsc','hppsc','opsc','tnpsc','tspsc','appsc','ossc','hssc','uksssc','bssc','dsssb','psssb','jssc','cgpsc','mpesb'
@@ -52,11 +52,14 @@ export class AutoAgent {
         const domainOk = isTrustedDomainShared(job.applyLink);
         const hasLink = !!(job.applyLink && job.applyLink.trim().length > 0);
         const actionOnly = isActionOnlyTitle(rawTitle);
+        const noticeLike = /\bno\.\s*\d|\bdated\b/i.test(rawTitle) || /\bno\.\s*\d|\bdated\b/i.test(info);
+        const likelyNotExam = noticeLike && !hasKeyword && !domainOk;
         return (
             !genericHeadBad &&
             !looksLikeUrl &&
             !hasQueryNoise &&
             !actionOnly &&
+            !likelyNotExam &&
             (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk) &&
             hasLink
         );

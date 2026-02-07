@@ -171,7 +171,9 @@ export const deriveReadableTitle = (job: JobTitleLike): string => {
     }
 
     const examName = normalizeSpaces(exam || cleanedForExamGuess || cleanedBase);
-    const composed = normalizeSpaces(`${examName} ${year} (${action})`)
+    const normalizedExam = normalizeSpaces(examName.replace(/^[\W_]+|[\W_]+$/g, ' '));
+    const safeExam = normalizedExam.length >= 6 ? normalizedExam : '';
+    const composed = normalizeSpaces(`${safeExam} ${year} (${action})`)
         .replace(
             /\b(recruitments?|recruitment\/engagement|news and notification|notifications?|vacancies?|vacancy notification|notification|advertisement|declared)\b/ig,
             ' '
@@ -192,7 +194,7 @@ export const isDisplayableJob = (job: JobTitleLike): boolean => {
     const strippedTitle = stripGenericHeadPrefix(rawTitle);
     const genericHeadBad = genericHead && strippedTitle.length < 12;
 
-    const looksLikeUrl = /^https?:\/\//i.test(rawTitle) || /https?:\/\//i.test(info);
+    const looksLikeUrl = /https?:\/\//i.test(rawTitle) || /https?:\/\//i.test(info) || /\bwww\./i.test(rawTitle) || /\bwww\./i.test(info);
     const hasQueryNoise = /(\bkey=|utm_|ref=)/i.test(rawTitle) || /(\bkey=|utm_|ref=)/i.test(info);
 
     const keywords = [
@@ -209,12 +211,25 @@ export const isDisplayableJob = (job: JobTitleLike): boolean => {
 
     const derived = deriveReadableTitle(job);
     const actionOnly = isActionOnlyTitle(derived);
+    const derivedLower = derived.toLowerCase();
+    const derivedLooksBad =
+        /https?:\/\//i.test(derived) ||
+        /\bwww\./i.test(derived) ||
+        /^[-–—]+\s*/.test(derived) ||
+        /\(\s*\)/.test(derived) ||
+        derivedLower === 'job notification' ||
+        derived.replace(/[()\s]/g, '').length < 10;
+
+    const noticeLike = /\bno\.\s*\d|\bdated\b/i.test(rawTitle) || /\bno\.\s*\d|\bdated\b/i.test(info);
+    const likelyNotExam = noticeLike && !hasKeyword && !domainOk;
 
     return (
         !genericHeadBad &&
         !looksLikeUrl &&
         !hasQueryNoise &&
         !actionOnly &&
+        !derivedLooksBad &&
+        !likelyNotExam &&
         (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk) &&
         hasLink
     );

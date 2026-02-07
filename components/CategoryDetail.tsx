@@ -3,6 +3,7 @@ import { ArrowLeft, Search, Calendar, ChevronRight, Filter } from 'lucide-react'
 import { SectionData, JobLink } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations, translateSectionTitle } from '../utils/translations';
+import { deriveReadableTitle } from '../shared/jobTitle';
 
 interface Props {
   category: SectionData;
@@ -26,7 +27,7 @@ const CategoryDetail: React.FC<Props> = ({ category, onBack, onJobClick }) => {
     } else {
       const lower = searchTerm.toLowerCase();
       setFilteredItems(category.items.filter(item => 
-        item.title.toLowerCase().includes(lower)
+        deriveReadableTitle({ title: item.title }).toLowerCase().includes(lower)
       ));
     }
   }, [searchTerm, category.items]);
@@ -84,12 +85,12 @@ const CategoryDetail: React.FC<Props> = ({ category, onBack, onJobClick }) => {
                 {filteredItems.map((item, index) => (
                     <div 
                         key={item.id}
-                        onClick={() => onJobClick(item.id, item.title)}
+                        onClick={() => onJobClick(item.id, deriveReadableTitle({ title: item.title }))}
                         className="group flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md hover:border-red-300 transition cursor-pointer"
                     >
                         <div className="flex-1 pr-4">
                             <h3 className="text-sm md:text-base font-semibold text-gray-800 group-hover:text-red-700 transition-colors line-clamp-2">
-                                {item.title}
+                                {deriveReadableTitle({ title: item.title })}
                                 {item.isNew && (
                                     <span className="ml-2 inline-block px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full border border-red-200">
                                         {t.new}
