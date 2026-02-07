@@ -1,0 +1,27 @@
+{
+    "name": "examsite",
+    "main": "src/worker.ts",
+    "compatibility_date": "2026-02-04",
+    "compatibility_flags": [
+        "nodejs_compat"
+    ],
+    "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS"
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "examsite-db",
+            "database_id": "d1245367-83e7-4fc4-bae4-f7f3b8c6f5c0"
+        }
+    ],
+    "vars": {
+        "SITE_URL": "https://examsite.in"
+    },
+    "triggers": {
+        "crons": [
+            "0 */4 * * *"
+        ]
+    }
+}

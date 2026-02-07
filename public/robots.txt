@@ -1,0 +1,21 @@
+# ExamSite.in Robots.txt
+# https://examsite.in
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://examsite.in/sitemap.xml
+
+# Block admin and API routes
+Disallow: /api/
+Disallow: /api/admin/
+
+# Allow search engines to crawl all public pages
+Allow: /about
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+Allow: /disclaimer
+Allow: /job/
+Allow: /category/
