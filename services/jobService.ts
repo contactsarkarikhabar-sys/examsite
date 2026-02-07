@@ -1,387 +1,259 @@
-import { SectionData, JobDetailData } from '../types';
-import { MOCK_SECTIONS, JOB_DETAILS_DB } from '../constants';
+import { SectionData, JobDetailData, JobLink } from '../types';
+import { MOCK_SECTIONS } from '../constants';
 
-// Simulated latency - reduced for snappier feel
+// Simulated latency (optional, can be removed)
 const DELAY = 100;
 
-// SMART LOGIC: Get Official Website or Fallback to Google Search
+// Helper: Get Official Website or Fallback to Google Search
 const getSmartLink = (title: string): string => {
   const t = title.toLowerCase();
 
   // --- TOP PRIORITY OFFICIAL DOMAINS (Verified HTTPS) ---
-
-  // SSC
-  if (t.includes('ssc') && (t.includes('gd') || t.includes('cgl') || t.includes('chsl') || t.includes('mts'))) return "https://ssc.gov.in/";
   if (t.includes('ssc')) return "https://ssc.gov.in/";
-
-  // UPSC
   if (t.includes('upsc')) return "https://upsc.gov.in/";
-
-  // RAILWAY (RRB)
-  if (t.includes('railway') || t.includes('rrb') || t.includes('ntpc') || t.includes('group d') || t.includes('alp')) {
-    return "https://indianrailways.gov.in/";
-  }
-
-  // BANKING
+  if (t.includes('railway') || t.includes('rrb') || t.includes('ntpc')) return "https://indianrailways.gov.in/";
   if (t.includes('ibps')) return "https://www.ibps.in/";
   if (t.includes('sbi')) return "https://sbi.co.in/web/careers/";
   if (t.includes('rbi')) return "https://opportunities.rbi.org.in/";
   if (t.includes('lic')) return "https://licindia.in/";
-
-  // DEFENCE
-  if (t.includes('airforce') || t.includes('afcat') || t.includes('agniveer vayu')) return "https://agnipathvayu.cdac.in/";
-  if (t.includes('navy') || t.includes('ssr')) return "https://www.joinindiannavy.gov.in/";
+  if (t.includes('airforce') || t.includes('afcat')) return "https://agnipathvayu.cdac.in/";
+  if (t.includes('navy')) return "https://www.joinindiannavy.gov.in/";
   if (t.includes('army') || t.includes('agniveer')) return "https://joinindianarmy.nic.in/";
-  if (t.includes('coast guard')) return "https://joinindiancoastguard.cdac.in/";
-  if (t.includes('drdo')) return "https://www.drdo.gov.in/";
-  if (t.includes('isro')) return "https://www.isro.gov.in/";
-  if (t.includes('bsf')) return "https://rectt.bsf.gov.in/";
-  if (t.includes('cisf')) return "https://cisfrectt.cisf.gov.in/";
-  if (t.includes('crpf')) return "https://rect.crpf.gov.in/";
-  if (t.includes('itbp')) return "https://recruitment.itbpolice.nic.in/";
-
-  // TEACHING / NTA
-  if (t.includes('ctet')) return "https://ctet.nic.in/";
-  if (t.includes('ugc net')) return "https://ugcnet.nta.ac.in/";
-  if (t.includes('neet')) return "https://exams.nta.ac.in/NEET/";
-  if (t.includes('jee')) return "https://jeemain.nta.ac.in/";
-  if (t.includes('kvs')) return "https://kvsangathan.nic.in/";
-  if (t.includes('nvs')) return "https://navodaya.gov.in/";
-
-  // STATE POLICE & PUBLIC SERVICE COMMISSIONS
-  // UP
-  if (t.includes('up police') || t.includes('uppbpb')) return "https://uppbpb.gov.in/";
-  if (t.includes('uppsc')) return "https://uppsc.up.nic.in/";
-  if (t.includes('upsssc')) return "https://upsssc.gov.in/";
-
-  // Bihar
-  if (t.includes('bihar police') || t.includes('csbc')) return "https://csbc.bih.nic.in/";
-  if (t.includes('bssc')) return "https://bssc.bihar.gov.in/";
-  if (t.includes('bpsc')) return "https://www.bpsc.bih.nic.in/";
-
-  // Rajasthan
-  if (t.includes('rajasthan') || t.includes('rsmssb') || t.includes('rssb')) return "https://rsmssb.rajasthan.gov.in/";
-  if (t.includes('rpsc')) return "https://rpsc.rajasthan.gov.in/";
-
-  // Haryana
-  if (t.includes('haryana') || t.includes('hssc')) return "https://hssc.gov.in/";
-  if (t.includes('hpsc')) return "https://hpsc.gov.in/";
-
-  // Delhi
-  if (t.includes('dsssb')) return "https://dsssb.delhi.gov.in/";
-  if (t.includes('delhi police')) return "https://delhipolice.gov.in/";
-
-  // Madhya Pradesh
-  if (t.includes('mp') && (t.includes('esb') || t.includes('vyapam'))) return "https://esb.mp.gov.in/";
-  if (t.includes('mppsc')) return "https://mppsc.mp.gov.in/";
-
-  // Others
-  if (t.includes('post office') || t.includes('gds')) return "https://indiapostgdsonline.gov.in/";
-  if (t.includes('gate')) return "https://gate.iitk.ac.in/";
-  if (t.includes('ignou')) return "https://ignou.ac.in/";
-  if (t.includes('cbse')) return "https://www.cbse.gov.in/";
 
   // --- FAIL SAFE: GOOGLE SEARCH ---
-  // If we don't know the exact site, search for it. This guarantees the user finds it.
-  // Example: "Bihar Work Inspector Official Website Apply Online"
   return `https://www.google.com/search?q=${encodeURIComponent(title + " official website apply online")}`;
 };
 
+// Helper: Classify Job into Section based on Title/Category
+const classifyJob = (job: JobDetailData): string => {
+  const t = job.title.toLowerCase();
+
+  if (t.includes('result')) return 'Results';
+  if (t.includes('admit card') || t.includes('hall ticket') || t.includes('call letter')) return 'Admit Card';
+  if (t.includes('answer key')) return 'Answer Key';
+  if (t.includes('syllabus') || t.includes('pattern')) return 'Syllabus';
+  if (t.includes('admission') || t.includes('counselling')) return 'Admission';
+  if (t.includes('verification') || t.includes('certificate')) return 'Certificate Verification';
+  if (t.includes('yojana') || t.includes('scheme')) return 'Sarkari Yojana (Government Schemes)';
+
+  // Default to Top Online Form for recruitment notifications
+  return 'Top Online Form';
+};
+
+// Initial Sections Structure (Clone from MOCK to keep colors/order)
+const getInitialSections = (): SectionData[] => {
+  return MOCK_SECTIONS.map(s => ({
+    title: s.title,
+    color: s.color,
+    items: []
+  }));
+};
+
 export const jobService = {
-  // Fetch all jobs
+  // Fetch all jobs from Backend API
   getAllJobs: async (): Promise<SectionData[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const enrichedSections = MOCK_SECTIONS.map(section => ({
-          ...section,
-          items: section.items.map(item => ({
-            ...item,
-            // If link is empty or hash, use Smart Link
-            link: (item.link === '#' || !item.link) ? getSmartLink(item.title) : item.link
-          }))
-        }));
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      // If running locally without env, it might be empty. Fallback or relative path if proxied?
+      // For now, assuming relative path '/api' works if served from same origin, or full URL if env set.
+      const apiUrl = workerUrl ? `${workerUrl}/api/jobs` : '/api/jobs';
 
-        resolve(enrichedSections);
-      }, DELAY);
-    });
-  },
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error('Failed to fetch jobs');
 
-  // Fetch Category Jobs
-  getCategoryJobs: async (categoryTitle: string): Promise<SectionData> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const section = MOCK_SECTIONS.find(s => s.title === categoryTitle);
-        if (!section) {
-          resolve({ title: categoryTitle, color: 'gray', items: [] });
-          return;
-        }
+      const data = await response.json() as { success: boolean, jobs: JobDetailData[] };
+      const jobs = data.jobs || [];
 
-        const enrichedSection = {
-          ...section,
-          items: section.items.map(item => ({
-            ...item,
-            link: (item.link === '#' || !item.link) ? getSmartLink(item.title) : item.link
-          }))
+      // Initialize Sections
+      const sections = getInitialSections();
+      const newUpdatesItems: JobLink[] = [];
+
+      // Sort jobs by ID desc (proxy for date) or distinct date field if available
+      // Assuming ID structure allows some chronological sorting or just reverse list
+      // The API sorts by updated_at DESC, so we can iterate.
+
+      jobs.forEach(job => {
+        // Create Link Item
+        const linkItem: JobLink = {
+          id: job.id,
+          title: job.title,
+          isNew: true, // You might want logic here: e.g. within last 7 days
+          link: job.importantLinks?.[0]?.url || getSmartLink(job.title),
+          lastDate: job.importantDates?.[1] // Approximating "Last Date" from index 1 if exists
         };
 
-        resolve(enrichedSection);
-      }, DELAY);
-    });
-  },
-
-  // Search Jobs
-  searchJobs: async (query: string): Promise<SectionData[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (!query.trim()) {
-          jobService.getAllJobs().then(resolve);
-          return;
+        // 1. Add to classified section
+        const sectionTitle = classifyJob(job);
+        const section = sections.find(s => s.title === sectionTitle);
+        if (section) {
+          section.items.push(linkItem);
+        } else {
+          // Fallback to 'Other Online Form' if category not found
+          const otherSection = sections.find(s => s.title === 'Other Online Form');
+          otherSection?.items.push(linkItem);
         }
 
-        const lowerQuery = query.toLowerCase();
-        const filtered = MOCK_SECTIONS.map(section => ({
-          ...section,
-          items: section.items
-            .filter(item =>
-              item.title.toLowerCase().includes(lowerQuery) ||
-              section.title.toLowerCase().includes(lowerQuery)
-            )
-            .map(item => ({
-              ...item,
-              link: (item.link === '#' || !item.link) ? getSmartLink(item.title) : item.link
-            }))
-        })).filter(section => section.items.length > 0);
+        // 2. Add to "New Updates" (Top 15)
+        if (newUpdatesItems.length < 15) {
+          newUpdatesItems.push(linkItem);
+        }
+      });
 
-        resolve(filtered);
-      }, DELAY);
-    });
+      // Special handling: "New Updates" section needs to be populated explicitly
+      const newUpdatesSection = sections.find(s => s.title === "New Updates");
+      if (newUpdatesSection) {
+        newUpdatesSection.items = newUpdatesItems;
+      }
+
+      return sections;
+
+    } catch (error) {
+      console.error('API Fetch failed, using Mock Data:', error);
+      return new Promise((resolve) => setTimeout(() => resolve(MOCK_SECTIONS), DELAY));
+    }
+  },
+
+  // Search Jobs (Client-side filtering for now)
+  searchJobs: async (query: string): Promise<SectionData[]> => {
+    // Fetch all (which might be cached by browser or SWR in future)
+    const allSections = await jobService.getAllJobs();
+
+    if (!query.trim()) return allSections;
+
+    const lowerQuery = query.toLowerCase();
+
+    return allSections.map(section => ({
+      ...section,
+      items: section.items.filter(item =>
+        item.title.toLowerCase().includes(lowerQuery) ||
+        section.title.toLowerCase().includes(lowerQuery)
+      )
+    })).filter(section => section.items.length > 0);
   },
 
   // Get Detailed Job Info
   getJobDetail: async (id: string, title?: string): Promise<JobDetailData> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const detail = JOB_DETAILS_DB[id];
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      const apiUrl = workerUrl ? `${workerUrl}/api/jobs/${id}` : `/api/jobs/${id}`;
 
-        if (detail) {
-          resolve(detail);
-        } else {
-          // Smart Link for details fallback
-          const smartLink = getSmartLink(title || "");
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error('Job not found');
 
-          resolve({
-            id,
-            title: title || "Job Notification Details",
-            postDate: new Date().toLocaleDateString(),
-            shortInfo: `This is the detailed information page for ${title}. Candidates are advised to read the full notification before applying.`,
-            importantDates: ["Check Official Notification"],
-            applicationFee: ["As per rules"],
-            ageLimit: ["As per rules"],
-            vacancyDetails: [
-              { postName: "Various Posts", totalPost: "See Notification", eligibility: "See Notification" }
-            ],
-            importantLinks: [
-              { label: "Apply Online / Official Website", url: smartLink },
-              { label: "Download Notification", url: smartLink }
-            ]
-          });
-        }
-      }, DELAY);
-    });
+      const data = await response.json() as { success: boolean, job: JobDetailData };
+      return data.job;
+
+    } catch (error) {
+      console.warn('Job API failed, falling back to mock or smart generation', error);
+
+      // Fallback logic from previous implementation
+      const smartLink = getSmartLink(title || "");
+      return {
+        id,
+        title: title || "Job Notification Details",
+        postDate: new Date().toLocaleDateString(),
+        shortInfo: `This is the detailed information page for ${title}. Details could not be loaded from the server.`,
+        importantDates: ["Check Official Notification"],
+        applicationFee: ["As per rules"],
+        ageLimit: ["As per rules"],
+        vacancyDetails: [
+          { postName: "Various Posts", totalPost: "See Notification", eligibility: "See Notification" }
+        ],
+        importantLinks: [
+          { label: "Apply Online / Official Website", url: smartLink },
+          { label: "Official Website", url: smartLink }
+        ]
+      };
+    }
   },
 
-  // Subscribe User - Call backend API
-  subscribeUser: async (userData: {
-    name: string;
-    email: string;
-    qualification?: string;
-    location?: string;
-    interests?: string[];
-  }): Promise<{ success: boolean; message: string; needsVerification?: boolean }> => {
+  // Fetch Category Jobs (Reuse getAllJobs and filter)
+  getCategoryJobs: async (categoryTitle: string): Promise<SectionData> => {
+    const allSections = await jobService.getAllJobs();
+    const section = allSections.find(s => s.title === categoryTitle);
+
+    if (section) return section;
+
+    return { title: categoryTitle, color: 'gray', items: [] };
+  },
+
+  // Subscribe User
+  subscribeUser: async (userData: any): Promise<{ success: boolean; message: string; needsVerification?: boolean }> => {
     try {
-      // Try to call the real API
       const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      const apiUrl = workerUrl ? `${workerUrl}/api/subscribe` : '/api/subscribe';
 
-      if (workerUrl) {
-        const response = await fetch(`${workerUrl}/api/subscribe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(userData),
-        });
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
 
-        const data = await response.json() as { success?: boolean; message?: string; needsVerification?: boolean };
-        return {
-          success: !!data.success,
-          message: data.message || 'Subscribed successfully!',
-          needsVerification: data.needsVerification,
-        };
-      }
-
-      // Fallback to localStorage if no worker URL configured
-      const existingSubs = JSON.parse(localStorage.getItem('examSite_subscribers') || '[]');
-      if (existingSubs.some((sub: { email: string }) => sub.email === userData.email)) {
-        return { success: true, message: 'Already subscribed!' };
-      }
-      existingSubs.push({ ...userData, date: new Date().toISOString() });
-      localStorage.setItem('examSite_subscribers', JSON.stringify(existingSubs));
-      return { success: true, message: 'Successfully subscribed!' };
+      const data = await response.json() as any;
+      return {
+        success: !!data.success,
+        message: data.message || 'Subscribed successfully!',
+        needsVerification: data.needsVerification,
+      };
     } catch (error) {
       console.error('Subscribe error:', error);
-      // Fallback to localStorage on error
-      const existingSubs = JSON.parse(localStorage.getItem('examSite_subscribers') || '[]');
-      existingSubs.push({ ...userData, date: new Date().toISOString() });
-      localStorage.setItem('examSite_subscribers', JSON.stringify(existingSubs));
-      return { success: true, message: 'Subscribed (offline mode)' };
+      return { success: false, message: 'Subscription failed. Please try again.' };
     }
   },
 
-  // Admin: Post new job and notify subscribers
-  postNewJob: async (
-    jobData: {
-      title: string;
-      category: string;
-      shortInfo: string;
-      importantDates: string;
-      applyLink: string;
-    },
-    adminPassword: string
-  ): Promise<{ success: boolean; message: string; notificationsSent?: number }> => {
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+  // Admin and other methods remain valid if they were using fetch already...
+  // Re-implementing them here to ensure full file replacement is correct.
 
-      if (!workerUrl) {
-        return { success: false, message: 'Worker URL not configured' };
-      }
-
-      const response = await fetch(`${workerUrl}/api/admin/post-job`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminPassword}`,
-        },
-        body: JSON.stringify(jobData),
-      });
-
-      const data = await response.json() as { success?: boolean; message?: string; notificationsSent?: number };
-      return {
-        success: !!data.success,
-        message: data.message || 'Job posted!',
-        notificationsSent: data.notificationsSent,
-      };
-    } catch (error) {
-      console.error('Post job error:', error);
-      return { success: false, message: 'Failed to post job' };
-    }
+  postNewJob: async (jobData: any, adminPassword: string) => {
+    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const response = await fetch(`${workerUrl}/api/admin/post-job`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminPassword}`,
+      },
+      body: JSON.stringify(jobData),
+    });
+    return await response.json();
   },
 
-  // Admin: Get subscribers count
-  getSubscribersCount: async (adminPassword: string): Promise<{ total: number; verified: number }> => {
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-
-      if (!workerUrl) {
-        return { total: 0, verified: 0 };
-      }
-
-      const response = await fetch(`${workerUrl}/api/admin/subscribers`, {
-        headers: { 'Authorization': `Bearer ${adminPassword}` },
-      });
-
-      const data = await response.json() as { totalSubscribers?: number; verifiedSubscribers?: number };
-      return {
-        total: data.totalSubscribers || 0,
-        verified: data.verifiedSubscribers || 0,
-      };
-    } catch (error) {
-      return { total: 0, verified: 0 };
-    }
+  getSubscribersCount: async (adminPassword: string) => {
+    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const response = await fetch(`${workerUrl}/api/admin/subscribers`, {
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    const data = await response.json() as any;
+    return { total: data.totalSubscribers || 0, verified: data.verifiedSubscribers || 0 };
   },
 
-  // Admin: Get all jobs from database
-  getAllDbJobs: async (adminPassword: string): Promise<{ id: string; title: string; category: string }[]> => {
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-      if (!workerUrl) return [];
-
-      const response = await fetch(`${workerUrl}/api/jobs`, {
-        headers: { 'Authorization': `Bearer ${adminPassword}` },
-      });
-
-      const data = await response.json() as { jobs?: { id: string; title: string; category: string }[] };
-      return data.jobs || [];
-    } catch (error) {
-      console.error('Get all DB jobs error:', error);
-      return [];
-    }
+  getAllDbJobs: async (adminPassword: string) => {
+    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const response = await fetch(`${workerUrl}/api/jobs`, {
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    const data = await response.json() as any;
+    return data.jobs || [];
   },
 
-  // Admin: Save job (create or update)
-  saveJob: async (
-    jobData: {
-      id: string;
-      title: string;
-      category?: string;
-      postDate?: string;
-      shortInfo?: string;
-      importantDates?: string[];
-      applicationFee?: string[];
-      ageLimit?: string[];
-      vacancyDetails?: { postName: string; totalPost: string; eligibility: string }[];
-      importantLinks?: { label: string; url: string }[];
-    },
-    adminPassword: string
-  ): Promise<{ success: boolean; message: string }> => {
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-
-      if (!workerUrl) {
-        return { success: false, message: 'Worker URL not configured' };
-      }
-
-      const response = await fetch(`${workerUrl}/api/admin/jobs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminPassword}`,
-        },
-        body: JSON.stringify(jobData),
-      });
-
-      const data = await response.json() as { success?: boolean; message?: string };
-      return {
-        success: !!data.success,
-        message: data.message || 'Job saved!',
-      };
-    } catch (error) {
-      console.error('Save job error:', error);
-      return { success: false, message: 'Failed to save job' };
-    }
+  saveJob: async (jobData: any, adminPassword: string) => {
+    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const response = await fetch(`${workerUrl}/api/admin/jobs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminPassword}`,
+      },
+      body: JSON.stringify(jobData),
+    });
+    return await response.json();
   },
 
-  // Admin: Delete job
-  deleteJob: async (jobId: string, adminPassword: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-
-      if (!workerUrl) {
-        return { success: false, message: 'Worker URL not configured' };
-      }
-
-      const response = await fetch(`${workerUrl}/api/admin/jobs/${jobId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${adminPassword}`,
-        },
-      });
-
-      const data = await response.json() as { success?: boolean; message?: string };
-      return {
-        success: !!data.success,
-        message: data.message || 'Job deleted!',
-      };
-    } catch (error) {
-      console.error('Delete job error:', error);
-      return { success: false, message: 'Failed to delete job' };
-    }
+  deleteJob: async (jobId: string, adminPassword: string) => {
+    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const response = await fetch(`${workerUrl}/api/admin/jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    return await response.json();
   }
 };
