@@ -468,7 +468,14 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
             const importantDates = JSON.parse(row.important_dates || '[]');
             const applicationFee = JSON.parse(row.application_fee || '[]');
             const ageLimit = JSON.parse(row.age_limit || '[]');
-            const vacancyDetails = JSON.parse(row.vacancy_details || '[]');
+            const vacancyDetailsRaw = JSON.parse(row.vacancy_details || '[]');
+            const vacancyDetails = Array.isArray(vacancyDetailsRaw)
+                ? vacancyDetailsRaw.map((v: any) => ({
+                    postName: String(v?.postName || ''),
+                    totalPost: String(v?.totalPost || ''),
+                    eligibility: String(v?.eligibility || '')
+                }))
+                : [];
             const importantLinks = (JSON.parse(row.important_links || '[]') as any[]).map((l: any) => ({
                 label: String(l?.label || ''),
                 url: String(l?.url || '').replace(/`/g, '').trim()
@@ -518,7 +525,14 @@ async function handleGetJob(request: Request, env: Env, jobId: string): Promise<
         const importantDates = JSON.parse((job as any).important_dates || '[]');
         const applicationFee = JSON.parse((job as any).application_fee || '[]');
         const ageLimit = JSON.parse((job as any).age_limit || '[]');
-        const vacancyDetails = JSON.parse((job as any).vacancy_details || '[]');
+        const vacancyDetailsRaw = JSON.parse((job as any).vacancy_details || '[]');
+        const vacancyDetails = Array.isArray(vacancyDetailsRaw)
+            ? vacancyDetailsRaw.map((v: any) => ({
+                postName: String(v?.postName || ''),
+                totalPost: String(v?.totalPost || ''),
+                eligibility: String(v?.eligibility || '')
+            }))
+            : [];
         const importantLinks = (JSON.parse((job as any).important_links || '[]') as any[]).map((l: any) => ({
             label: String(l?.label || ''),
             url: String(l?.url || '').replace(/`/g, '').trim()

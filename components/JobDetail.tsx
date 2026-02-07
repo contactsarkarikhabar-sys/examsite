@@ -187,7 +187,7 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
             )}
         </div>
 
-        {job.vacancyDetails && job.vacancyDetails.length > 0 && job.vacancyDetails[0].postName.trim().length > 0 && (
+        {job.vacancyDetails && job.vacancyDetails.length > 0 && String(job.vacancyDetails[0]?.postName || '').trim().length > 0 && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden mb-8 hover:shadow-xl transition-shadow duration-300">
               <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4 flex items-center justify-between">
                   <h3 className="text-xl font-bold flex items-center">
@@ -206,9 +206,9 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
                       <tbody className="divide-y divide-gray-100">
                           {job.vacancyDetails.map((row, idx) => (
                               <tr key={idx} className="hover:bg-red-50/50 transition-colors">
-                                  <td className="px-6 py-4 font-bold text-red-700 whitespace-nowrap">{row.postName}</td>
-                                  <td className="px-6 py-4 font-bold text-gray-800">{row.totalPost}</td>
-                                  <td className="px-6 py-4 text-gray-600 leading-relaxed min-w-[300px]">{row.eligibility}</td>
+                                  <td className="px-6 py-4 font-bold text-red-700 whitespace-nowrap">{String(row?.postName || '')}</td>
+                                  <td className="px-6 py-4 font-bold text-gray-800">{String(row?.totalPost || '')}</td>
+                                  <td className="px-6 py-4 text-gray-600 leading-relaxed min-w-[300px]">{String(row?.eligibility || '')}</td>
                               </tr>
                           ))}
                       </tbody>
@@ -227,7 +227,7 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
             </ul>
         </div>
 
-        {job.importantLinks && job.importantLinks.length > 0 && job.importantLinks[0].url.trim().length > 0 && (
+        {job.importantLinks && job.importantLinks.length > 0 && String(job.importantLinks[0]?.url || '').trim().length > 0 && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
               <div className="bg-red-50 p-4 border-b border-red-100">
                   <h3 className="text-xl font-bold text-red-800 flex items-center">
@@ -244,13 +244,13 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
                                </span>
                           </div>
                           <a 
-                              href={link.url} 
+                              href={String(link?.url || '')} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="inline-flex items-center justify-center bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all w-full md:w-auto"
                           >
-                              {link.label.toLowerCase().includes("download") ? <Download size={16} className="mr-2" /> : 
-                               link.label.toLowerCase().includes("official") ? <Globe size={16} className="mr-2" /> : 
+                              {String(link?.label || '').toLowerCase().includes("download") ? <Download size={16} className="mr-2" /> : 
+                               String(link?.label || '').toLowerCase().includes("official") ? <Globe size={16} className="mr-2" /> : 
                                <ExternalLink size={16} className="mr-2" />}
                               {t.clickHere}
                           </a>
