@@ -1,337 +1,516 @@
-import { SectionData, JobDetailData, JobLink } from '../types';
-import { MOCK_SECTIONS } from '../constants';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Simulated latency (optional, can be removed)
-const DELAY = 100;
+interface Env {
+    DB: D1Database;
+    GOOGLE_SEARCH_API_KEY: string;
+    GOOGLE_SEARCH_CX: string;
+    GEMINI_API_KEY: string;
+    SERP_API_KEY: string;
+}
 
-// Helper: Get Official Website or Fallback to Google Search
-const getSmartLink = (title: string): string => {
-  const t = title.toLowerCase();
+interface SearchResult {
+    title: string;
+    link: string;
+    snippet: string;
+}
 
-  // --- TOP PRIORITY OFFICIAL DOMAINS (Verified HTTPS) ---
-  if (t.includes('ssc')) return "https://ssc.gov.in/";
-  if (t.includes('upsc')) return "https://upsc.gov.in/";
-  if (t.includes('railway') || t.includes('rrb') || t.includes('ntpc')) return "https://indianrailways.gov.in/";
-  if (t.includes('ibps')) return "https://www.ibps.in/";
-  if (t.includes('sbi')) return "https://sbi.co.in/web/careers/";
-  if (t.includes('rbi')) return "https://opportunities.rbi.org.in/";
-  if (t.includes('lic')) return "https://licindia.in/";
-  if (t.includes('airforce') || t.includes('afcat')) return "https://agnipathvayu.cdac.in/";
-  if (t.includes('navy')) return "https://www.joinindiannavy.gov.in/";
-  if (t.includes('army') || t.includes('agniveer')) return "https://joinindianarmy.nic.in/";
+interface ParsedJob {
+    title: string;
+    category: string;
+    shortInfo: string;
+    importantDates: string; // JSON string
+    applicationFee: string; // JSON string
+    ageLimit: string;       // JSON string
+    vacancyDetails: string; // JSON string
+    importantLinks: string; // JSON string
+    applyLink: string;
+}
 
-  // --- FAIL SAFE: GOOGLE SEARCH ---
-  return `https://www.google.com/search?q=${encodeURIComponent(title + " official website apply online")}`;
-};
+export class AutoAgent {
+    private env: Env;
 
-// Helper: Classify Job into Section based on Title/Category
-const classifyJob = (job: JobDetailData): string => {
-  const t = job.title.toLowerCase();
+    // Priority domains for authentic info
+    private readonly TRUSTED_SITES = [
+        'ssc.gov.in', 'upsc.gov.in', 'indianrailways.gov.in', 'ibps.in',
+        'rbi.org.in', 'drdo.gov.in', 'isro.gov.in', 'joinindianarmy.nic.in',
+        'joinindiannavy.gov.in', 'agnipathvayu.cdac.in'
+    ];
 
-  if (t.includes('result')) return 'Results';
-  if (t.includes('admit card') || t.includes('hall ticket') || t.includes('call letter')) return 'Admit Card';
-  if (t.includes('answer key')) return 'Answer Key';
-  if (t.includes('syllabus') || t.includes('pattern')) return 'Syllabus';
-  if (t.includes('admission') || t.includes('counselling')) return 'Admission';
-  if (t.includes('verification') || t.includes('certificate')) return 'Certificate Verification';
-  if (t.includes('yojana') || t.includes('scheme')) return 'Sarkari Yojana (Government Schemes)';
-
-  // Default to Top Online Form for recruitment notifications
-  return 'Top Online Form';
-};
-
-const deriveReadableTitle = (job: JobDetailData): string => {
-  const rawTitle = (job.title || '').trim();
-  const info = (job.shortInfo || '').trim();
-  const firstInfo = info.split(/[\n\.]/)[0].replace(/\s{2,}/g, ' ').trim();
-  const cleanedTitle = rawTitle
-    .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
-    .replace(/\s*\|\s*/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  if (firstInfo && firstInfo.length > 10) {
-    return cleanedTitle ? `${firstInfo} — ${cleanedTitle}` : firstInfo;
-  }
-  try {
-    const url = job.importantLinks?.[0]?.url || '';
-    const host = url ? new URL(url).hostname : '';
-    const hostPart = host.split('.').filter(Boolean)[0] || '';
-    const org = hostPart ? hostPart.charAt(0).toUpperCase() + hostPart.slice(1) : '';
-    if (org && !/recruitment/i.test(rawTitle)) {
-      return `${rawTitle} — ${org}`;
-    }
-  } catch {}
-  return rawTitle;
-};
-
-const isDisplayableJob = (job: JobDetailData): boolean => {
-  const rawTitle = (job.title || '');
-  const title = rawTitle.toLowerCase().replace(/\s{2,}/g, ' ').trim();
-  const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
-  const titleLen = title.length;
-  const infoLen = info.length;
-  const genericHead = /^(recruitment|vacancies|vacancy notification|notification|news and notification|recruitment\/engagement)\b/i.test(rawTitle);
-  const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice'];
-  const hasKeyword = keywords.some(k => title.includes(k) || info.includes(k));
-  let domainOk = false;
-  try {
-    const url = job.importantLinks?.[0]?.url || '';
-    const host = url ? new URL(url).hostname : '';
-    domainOk = /\.(gov\.in|nic\.in)$/.test(host) || /upsc\.gov\.in|ssc\.gov\.in|ibps\.in|sbi\.co\.in|rbi\.org\.in/.test(host);
-  } catch {}
-  const hasLink = !!(job.importantLinks?.[0]?.url);
-  return (!genericHead && (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk)) && hasLink;
-};
-
-// Initial Sections Structure (Clone from MOCK to keep colors/order AND items)
-const getInitialSections = (): SectionData[] => {
-  // Deep copy to avoid mutating the original constant if we modify it later
-  return JSON.parse(JSON.stringify(MOCK_SECTIONS));
-};
-
-// --- CACHING LOGIC ---
-let cachedSections: SectionData[] | null = null;
-let lastFetchTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
-
-export const jobService = {
-  // Fetch all jobs from Backend API (With Caching)
-  getAllJobs: async (forceRefresh = false): Promise<SectionData[]> => {
-    const now = Date.now();
-
-    // Return cached if available and fresh
-    if (!forceRefresh && cachedSections && (now - lastFetchTime < CACHE_DURATION)) {
-      return JSON.parse(JSON.stringify(cachedSections)); // Return copy to avoid mutation
+    constructor(env: Env) {
+        this.env = env;
     }
 
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-      const apiUrl = workerUrl ? `${workerUrl}/api/jobs` : '/api/jobs';
+    private isTrustedDomain(urlStr: string): boolean {
+        try {
+            const host = new URL(urlStr).hostname;
+            if (!host) return false;
+            if (/\.(gov\.in|nic\.in)$/.test(host)) return true;
+            return this.TRUSTED_SITES.some(s => host.endsWith(s));
+        } catch {
+            return false;
+        }
+    }
 
-      // Start with Mock Data (Hybrid Approach)
-      const sections = getInitialSections();
+    private isClaritySufficient(job: ParsedJob): boolean {
+        const title = (job.title || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+        const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+        const titleLen = title.length;
+        const infoLen = info.length;
+        const genericHead = /^(recruitment|vacancies|vacancy notification|notification|news and notification|recruitment\/engagement)\b/i.test(job.title || '');
+        const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice',
+            'uppsc','upsssc','rpsc','rsmssb','mppsc','bpsc','wbpsc','jkpsc','jpsc','mpsc','kpsc','gpsc','hpsc','hppsc','opsc','tnpsc','tspsc','appsc','ossc','hssc','uksssc','bssc','dsssb','psssb','jssc','cgpsc','mpesb'
+        ];
+        const hasKeyword = keywords.some(k => title.includes(k) || info.includes(k));
+        const domainOk = this.isTrustedDomain(job.applyLink);
+        const hasLink = !!(job.applyLink && job.applyLink.trim().length > 0);
+        return (!genericHead && (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk)) && hasLink;
+    }
 
-      try {
-        const response = await fetch(apiUrl);
-        if (response.ok) {
-          const data = await response.json() as { success: boolean, jobs: JobDetailData[] };
-          const jobs = data.jobs || [];
+    async run(): Promise<{ success: boolean; message: string; jobsAdded: number; debug?: any }> {
+        try {
+            console.log('Starting AutoAgent run...');
+            const currentYear = new Date().getFullYear();
 
-          const newUpdatesItems: JobLink[] = [];
+            const query = `(site:gov.in OR site:nic.in) recruitment notification ${currentYear}`;
 
-          jobs.forEach(job => {
-            if (!isDisplayableJob(job)) {
-              return;
+            const { results, debug } = await this.searchSerpApi(query);
+
+            if (results.length === 0) {
+                return {
+                    success: true,
+                    message: `No new jobs found.`,
+                    jobsAdded: 0,
+                    debug
+                };
             }
-            // Create Link Item
-            const linkItem: JobLink = {
-              id: job.id,
-              title: deriveReadableTitle(job),
-              isNew: true, // New jobs from DB are always "New"
-              link: job.importantLinks?.[0]?.url || getSmartLink(job.title),
-              lastDate: job.importantDates?.[1]
+
+            // Process results
+            let jobsAdded = 0;
+            const uniqueResults = await this.filterExistingJobs(results);
+
+            console.log(`Found ${uniqueResults.length} unique results to analyze.`);
+
+            const skippedReasons: string[] = [];
+
+            for (const result of uniqueResults) {
+                console.log(`Analyzing: ${result.title}`);
+                try {
+                    const job = await this.analyzeWithGemini(result);
+                    if (job) {
+                        if (this.isClaritySufficient(job)) {
+                            console.log(`Saving job: ${job.title}`);
+                            await this.saveJobToDb(job);
+                            jobsAdded++;
+                        } else {
+                            skippedReasons.push(`Unclear: ${job.title.substring(0, 40)}... from ${result.link}`);
+                        }
+                    } else {
+                        skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null)`);
+                    }
+                } catch (e) {
+                    skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
+                }
+            }
+
+            return {
+                success: true,
+                message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
+                jobsAdded,
+                debug: {
+                    ...debug,
+                    uniqueResults: uniqueResults.length,
+                    skippedReasons
+                }
             };
 
-            // 1. Add to classified section
-            const sectionTitle = classifyJob(job);
-            const section = sections.find(s => s.title === sectionTitle);
-            if (section) {
-              // Prepend to show at top
-              section.items.unshift(linkItem);
-            } else {
-              const otherSection = sections.find(s => s.title === 'Other Online Form');
-              otherSection?.items.unshift(linkItem);
+        } catch (error) {
+            // Log error but strict check to return JSON not crash
+            console.error('AutoAgent Error:', error);
+            return { success: false, message: `Error: ${(error as Error).message || error}`, jobsAdded: 0 };
+        }
+    }
+
+    private async searchSerpApi(query: string): Promise<{ results: SearchResult[]; debug: any }> {
+        console.log('searchSerpApi called with query:', query);
+
+        const debug = {
+            keysConfigured: {
+                serpKey: !!this.env.SERP_API_KEY && !this.env.SERP_API_KEY.includes('REPLACE')
+            },
+            query,
+            url: '',
+            status: 0,
+            dataSnippet: ''
+        };
+
+        if (!debug.keysConfigured.serpKey) {
+            console.warn('SerpAPI Key missing or invalid.');
+            return { results: [], debug: { ...debug, error: 'Missing SERP_API_KEY' } };
+        }
+
+        // SerpAPI Endpoint
+        // Engine: google, google_domain: google.co.in, gl: in (India)
+        const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${this.env.SERP_API_KEY}&num=10&google_domain=google.co.in&gl=in&tbs=qdr:w`;
+        debug.url = url.replace(this.env.SERP_API_KEY, 'HIDDEN_KEY');
+
+        console.log('Fetching SerpAPI...');
+        const response = await fetch(url);
+        debug.status = response.status;
+
+        const data = await response.json() as any;
+        debug.dataSnippet = JSON.stringify(data).substring(0, 500); // Capture start of response (error or items)
+
+        console.log('SerpAPI Response status:', response.status);
+
+        if (data.error) {
+            console.error('SerpAPI Error:', JSON.stringify(data.error));
+        }
+
+        // SerpAPI returns results in 'organic_results'
+        if (!data.organic_results) return { results: [], debug };
+
+        const results = data.organic_results.map((item: any) => ({
+            title: item.title,
+            link: item.link,
+            snippet: item.snippet
+        }));
+
+        return { results, debug };
+    }
+
+    private async filterExistingJobs(results: SearchResult[]): Promise<SearchResult[]> {
+        const uniqueResults: SearchResult[] = [];
+        for (const result of results) {
+            const byLink = await this.env.DB.prepare('SELECT id FROM job_details WHERE apply_link = ?')
+                .bind(result.link)
+                .first();
+            const byTitle = await this.env.DB.prepare('SELECT id FROM job_details WHERE title = ?')
+                .bind(result.title)
+                .first();
+            const exists = byLink || byTitle;
+            console.log(`Dedup check: title="${result.title}" link="${result.link}" exists=${!!exists}`);
+            if (!exists) {
+                uniqueResults.push(result);
+            }
+        }
+        return uniqueResults;
+    }
+
+    private async analyzeWithGemini(result: SearchResult): Promise<ParsedJob | null> {
+        if (!this.env.GEMINI_API_KEY) {
+            throw new Error("GEMINI_API_KEY is missing in environment");
+        }
+
+        // 1. Dynamically fetch available models to avoid 404s
+        let targetModel = 'gemini-1.5-flash'; // Default fallback
+        try {
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.env.GEMINI_API_KEY}`;
+            const response = await fetch(listUrl);
+            if (response.ok) {
+                const data = await response.json() as any;
+                const models = data.models.map((m: any) => m.name.split('/')[1]);
+                // Prefer Pro if available, else Flash
+                if (models.includes('gemini-1.5-pro-latest')) targetModel = 'gemini-1.5-pro-latest';
+                else if (models.includes('gemini-1.5-pro')) targetModel = 'gemini-1.5-pro';
+                else if (models.includes('gemini-1.5-flash-latest')) targetModel = 'gemini-1.5-flash-latest';
+            }
+        } catch (e) {
+            console.warn('Failed to fetch Gemini model list, using default:', targetModel);
+        }
+
+        // 2. Fetch Page Content (Truncated)
+        let pageContext = `Snippet: ${result.snippet}`;
+        try {
+            // console.log(`Fetching content for: ${result.link}`);
+            const pageContent = await this.fetchPageContent(result.link);
+            if (pageContent) {
+                pageContext = `Full Page Content (Truncated to 10k chars): ${pageContent.slice(0, 10000)}`;
+            }
+        } catch (err) {
+            console.warn(`Failed to fetch ${result.link}, using snippet only.`);
+        }
+
+        try {
+            console.log(`Trying Gemini Model: ${targetModel} for ${result.title.substring(0, 20)}...`);
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${this.env.GEMINI_API_KEY}`;
+
+            const promptText = `
+            You are an expert job data extractor.
+            Task: Extract structured job details from the provided text.
+            
+            Source 1 (Title): ${result.title}
+            Source 2 (Link): ${result.link}
+            Source 3 (Content): ${pageContext}
+
+            RULES:
+            1. **EXTRACT ANYTHING**: If exact dates/fees are missing, INFER them from context or use "Check Notification".
+            2. **DO NOT FAIL**: Mispelled words or partial data is OKAY. Return the best possible JSON.
+            3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, Other].
+            
+            Return ONLY a valid JSON object with this schema:
+            {
+                "title": "Clean Job Title",
+                "category": "Category Name",
+                "shortInfo": "2-3 sentences summary",
+                "importantDates": ["Application Begin: DD/MM/YYYY", "Last Date: DD/MM/YYYY"], 
+                "applicationFee": ["General/OBC: ₹000", "SC/ST: ₹000"],
+                "ageLimit": ["Min: 18 Years", "Max: 30 Years"],
+                "vacancyDetails": [{"postName": "Post Name", "totalPost": "Number", "eligibility": "Degree/10th/12th"}],
+                "importantLinks": [
+                    {"label": "Apply Online", "url": "${result.link}"},
+                    {"label": "Official Website", "url": "Find in text or use ${result.link}"}
+                ]
+            }
+            `;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: promptText }] }],
+                    generationConfig: { response_mime_type: "application/json" }
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API Error (${targetModel}) ${response.status}: ${errorText}`);
             }
 
-            // 2. Add to "New Updates" (Top 15 candidate)
-            newUpdatesItems.push(linkItem);
-          });
+            const data: any = await response.json();
+            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-          // Prepend new updates to the existing "New Updates" section
-          const newUpdatesSection = sections.find(s => s.title === "New Updates");
-          if (newUpdatesSection) {
-            // Add new DB jobs to the top of New Updates
-            newUpdatesSection.items = [...newUpdatesItems, ...newUpdatesSection.items];
-          }
+            if (!rawText) throw new Error("Empty response from Gemini");
+
+            const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanText);
+
+            // Normalize fields to ensure strings for DB
+            const sanitizeUrl = (u: string) => (u || '').replace(/`/g, '').trim();
+            const makeReadableTitle = (rawTitle: string, shortInfo: string, link: string) => {
+                const cleanedBase = (rawTitle || '').trim()
+                    .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
+                    .replace(/https?:\/\/\S+/ig, '')
+                    .replace(/\s*\|\s*/g, ' ')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+                const lowerAll = (cleanedBase + ' ' + (shortInfo || '')).toLowerCase();
+                const yearMatch = (cleanedBase.match(/20\d{2}/) || (shortInfo || '').match(/20\d{2}/));
+                const year = yearMatch ? yearMatch[0] : '';
+                const patterns: Array<{ re: RegExp; name: string }> = [
+                    { re: /\brrb\s*je\b/i, name: 'Railway RRB JE' },
+                    { re: /\brrb\s*group\s*d\b/i, name: 'Railway RRB Group D' },
+                    { re: /\brrb\s*alp\b/i, name: 'Railway RRB ALP' },
+                    { re: /\bssc\s*cgl\b/i, name: 'SSC CGL' },
+                    { re: /\bssc\s*chsl\b/i, name: 'SSC CHSL' },
+                    { re: /\bssc\s*mts\b/i, name: 'SSC MTS' },
+                    { re: /\buppsc\b/i, name: 'UPPSC' },
+                    { re: /\bupsssc\b/i, name: 'UPSSSC' },
+                    { re: /\bnhm\s+maharashtra\b/i, name: 'NHM Maharashtra' },
+                    { re: /\b(tshc|telangana\s+high\s+court)\b/i, name: 'Telangana High Court' },
+                    { re: /\bpsssb\b/i, name: 'Punjab SSSB' },
+                    { re: /\brpsc\b/i, name: 'RPSC' },
+                    { re: /\brsmssb|rssb\b/i, name: 'RSMSSB' },
+                    { re: /\bmppsc\b/i, name: 'MPPSC' },
+                    { re: /\bbpsc\b/i, name: 'BPSC' },
+                    { re: /\bwbpsc\b/i, name: 'WBPSC' },
+                    { re: /\bjkpsc\b/i, name: 'JKPSC' },
+                    { re: /\bjpsc\b/i, name: 'JPSC' },
+                    { re: /\bmpsc\b/i, name: 'MPSC' },
+                    { re: /\bgpsc\b/i, name: 'GPSC' }
+                ];
+                let exam = '';
+                for (const p of patterns) {
+                    if (p.re.test(cleanedBase) || p.re.test(shortInfo || '')) {
+                        exam = p.name;
+                        break;
+                    }
+                }
+                if (!exam) {
+                    try {
+                        const host = new URL(link).hostname;
+                        if (/sssb\.punjab\.gov\.in$/i.test(host)) exam = 'Punjab SSSB';
+                        else if (/rpsc\.rajasthan\.gov\.in$/i.test(host)) exam = 'RPSC';
+                        else if (/upsssc\.gov\.in$/i.test(host)) exam = 'UPSSSC';
+                        else if (/uppsc\.up\.nic\.in$/i.test(host)) exam = 'UPPSC';
+                        else if (/esb\.mp\.gov\.in$/i.test(host)) exam = 'MPESB';
+                    } catch {}
+                }
+                let action = 'Online Form';
+                const t = cleanedBase.toLowerCase();
+                if (t.includes('admit card') || t.includes('hall ticket') || t.includes('call letter')) {
+                    action = 'Admit Card';
+                } else if (t.includes('answer key')) {
+                    action = 'Answer Key';
+                } else if (t.includes('syllabus') || t.includes('pattern')) {
+                    action = 'Syllabus';
+                } else if (t.includes('result')) {
+                    action = 'Result';
+                } else if (t.includes('status')) {
+                    action = 'Online Application Status';
+                } else if (t.includes('counselling') || t.includes('admission')) {
+                    action = 'Admission';
+                }
+                if (/application\s+status|status\s+check/i.test(lowerAll)) {
+                    action = 'Online Application Status';
+                }
+                return `${(exam || cleanedBase).trim()}${year ? ' ' + year : ''} ${action}`.replace(/\s{2,}/g, ' ').trim();
+            };
+            const links = Array.isArray(parsed.importantLinks)
+                ? parsed.importantLinks.map((l: any) => ({
+                    label: String(l.label || 'Link'),
+                    url: sanitizeUrl(String(l.url || result.link))
+                }))
+                : [{ label: "Apply Link", url: sanitizeUrl(result.link) }];
+            return {
+                title: makeReadableTitle(parsed.title || result.title, parsed.shortInfo || result.snippet, sanitizeUrl(result.link)),
+                category: parsed.category || 'Other',
+                shortInfo: parsed.shortInfo || result.snippet,
+                importantDates: JSON.stringify(parsed.importantDates || ["Check Notification"]),
+                applicationFee: JSON.stringify(parsed.applicationFee || ["See Notification"]),
+                ageLimit: JSON.stringify(parsed.ageLimit || ["See Notification"]),
+                vacancyDetails: JSON.stringify(parsed.vacancyDetails || []),
+                importantLinks: JSON.stringify(links),
+                applyLink: sanitizeUrl(result.link)
+            };
+
+        } catch (e) {
+            console.warn(`Gemini Failed for ${result.title}. Using SMART FALLBACK. Error: ${e}`);
+
+            // === SMART FALLBACK (Regex Extraction) ===
+            const snippet = result.snippet || "";
+            const currentYear = new Date().getFullYear();
+
+            // Extract Dates (DD/MM/YYYY or DD-MM-YYYY)
+            const dateRegex = /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/g;
+            const datesFound = snippet.match(dateRegex) || [];
+            const importantDates = datesFound.length > 0
+                ? datesFound.map(d => `Date: ${d}`)
+                : [`Expected: ${currentYear}`];
+
+            // Extract Fees (₹ followed by digits)
+            const feeRegex = /(₹\s?\d+)/g;
+            const feesFound = snippet.match(feeRegex) || [];
+            const applicationFee = feesFound.length > 0
+                ? feesFound.map(f => `Fee: ${f}`)
+                : ["See Notification"];
+
+            const ageMinMatch = snippet.match(/(?:Min(?:imum)?\s*Age)\s*[:\-]?\s*(\d{1,2})/i);
+            const ageMaxMatch = snippet.match(/(?:Max(?:imum)?\s*Age)\s*[:\-]?\s*(\d{1,2})/i);
+            const ageLimitArr: string[] = [];
+            if (ageMinMatch) ageLimitArr.push(`Minimum Age: ${ageMinMatch[1]} Years`);
+            if (ageMaxMatch) ageLimitArr.push(`Maximum Age: ${ageMaxMatch[1]} Years`);
+            if (ageLimitArr.length === 0) ageLimitArr.push("As per rules");
+
+            const postName =
+                (snippet.match(/(?:post(?:s)?\s+of|recruitment\s+for|engagement\s+of|for\s+the\s+post\s+of)\s+([A-Za-z][A-Za-z\s\-\/&]+)/i)?.[1] || '')
+                    .trim() ||
+                (snippet.match(/\b(Jeep Driver|Driver|Clerk|Officer|Assistant|Engineer|Teacher|Nurse|Police|Constable|Inspector|Stenographer|Typist|Analyst|Apprentice|Junior|Senior)\b/i)?.[0] || 'Various Posts');
+            const totalPost =
+                (snippet.match(/total\s*posts?\s*[:\-]?\s*(\d{1,4})/i)?.[1] ||
+                 snippet.match(/\b(\d{1,4})\s+posts?\b/i)?.[1] || 'N/A');
+            const eligibilityKeywords = [
+                '10th', '12th', 'Matric', 'Intermediate', 'Graduate', 'Bachelor', 'Diploma', 'ITI',
+                'BTech', 'MTech', 'B.Sc', 'M.Sc', 'MBA', 'CA', 'LLB', 'BE', 'ME'
+            ];
+            const foundEligibility = eligibilityKeywords.filter(k => new RegExp(k.replace('.', '\\.'), 'i').test(snippet));
+            const eligibility = foundEligibility.length > 0 ? foundEligibility.join(' / ') : 'See Details';
+            const vacancyDetails = [{ postName, totalPost, eligibility }];
+
+            return {
+                title: (function () {
+                    const base = (result.title || '').trim()
+                        .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
+                        .replace(/\s*\|\s*/g, ' ')
+                        .replace(/\s{2,}/g, ' ')
+                        .trim();
+                    const firstInfo = (snippet || '').split(/[\n\.]/)[0].replace(/\s{2,}/g, ' ').trim();
+                    if (firstInfo && firstInfo.length > 10) {
+                        return base ? `${firstInfo} — ${base}` : firstInfo;
+                    }
+                    try {
+                        const host = new URL(result.link || '').hostname;
+                        const org = (host.split('.').filter(Boolean)[0] || '').replace(/-/g, ' ');
+                        const orgCap = org ? org.charAt(0).toUpperCase() + org.slice(1) : '';
+                        if (orgCap && !/recruitment/i.test(base)) {
+                            return base ? `${base} — ${orgCap}` : orgCap;
+                        }
+                    } catch {}
+                    return base || result.title;
+                })(),
+                category: 'Other',
+                shortInfo: snippet.length > 50 ? snippet : `${result.title} - Click to read more.`,
+                importantDates: JSON.stringify(importantDates),
+                applicationFee: JSON.stringify(applicationFee),
+                ageLimit: JSON.stringify(ageLimitArr),
+                vacancyDetails: JSON.stringify(vacancyDetails),
+                importantLinks: JSON.stringify([{ label: "Source Link", url: result.link }]),
+                applyLink: result.link
+            };
         }
-      } catch (err) {
-        console.warn('API fetch failed, using mock/cached data', err);
-        // If API fails but we have cache (even if old), return it? 
-        // Better to return the "Fresh Mock" sections we just created to be safe,
-        // OR return stale cache. For now, let's stick to returning the sections we prepared (Mock).
-      }
-
-      // Update Cache
-      cachedSections = sections;
-      lastFetchTime = now;
-
-      return sections;
-
-    } catch (error) {
-      console.error('Critical error in getAllJobs:', error);
-      return MOCK_SECTIONS;
-    }
-  },
-
-  // Search Jobs (Client-side filtering for now)
-  searchJobs: async (query: string): Promise<SectionData[]> => {
-    // Fetch all (which might be cached by browser or SWR in future)
-    const allSections = await jobService.getAllJobs();
-
-    if (!query.trim()) return allSections;
-
-    const lowerQuery = query.toLowerCase();
-
-    return allSections.map(section => ({
-      ...section,
-      items: section.items.filter(item =>
-        item.title.toLowerCase().includes(lowerQuery) ||
-        section.title.toLowerCase().includes(lowerQuery)
-      )
-    })).filter(section => section.items.length > 0);
-  },
-
-  // Get Detailed Job Info
-  getJobDetail: async (id: string, title?: string): Promise<JobDetailData> => {
-    // 1. Check if it's a mock job in our extensive internal DB
-    // This ensures rich details for "static" jobs even if API is down or empty
-    const { JOB_DETAILS_DB } = await import('../constants'); // Dynamic import to avoid circular dependency issues if any
-    if (JOB_DETAILS_DB[id]) {
-      return JOB_DETAILS_DB[id];
     }
 
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-      const apiUrl = workerUrl ? `${workerUrl}/api/jobs/${id}` : `/api/jobs/${id}`;
+    private async fetchPageContent(url: string): Promise<string | null> {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error('Job not found');
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                },
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
 
-      const data = await response.json() as { success: boolean, job: JobDetailData };
-      const job = data.job;
-      const readable = deriveReadableTitle(job);
-      return { ...job, title: readable };
+            if (!response.ok) return null;
 
-    } catch (error) {
-      console.warn('Job API failed, falling back to mock or smart generation', error);
-
-      // Fallback logic from previous implementation
-      const smartLink = getSmartLink(title || "");
-      return {
-        id,
-        title: title || "Job Notification Details",
-        postDate: new Date().toLocaleDateString(),
-        shortInfo: `This is the detailed information page for ${title}. Details could not be loaded from the server.`,
-        importantDates: ["Check Official Notification"],
-        applicationFee: ["As per rules"],
-        ageLimit: ["As per rules"],
-        vacancyDetails: [
-          { postName: "Various Posts", totalPost: "See Notification", eligibility: "See Notification" }
-        ],
-        importantLinks: [
-          { label: "Apply Online / Official Website", url: smartLink },
-          { label: "Official Website", url: smartLink }
-        ]
-      };
+            const html = await response.text();
+            // Simple strip tags to get text content
+            return html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, "")
+                .replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, "")
+                .replace(/<[^>]+>/g, "\n")
+                .replace(/\s+/g, " ")
+                .trim();
+        } catch (e) {
+            return null;
+        }
     }
-  },
 
-  // Fetch Category Jobs (Reuse getAllJobs and filter)
-  getCategoryJobs: async (categoryTitle: string): Promise<SectionData> => {
-    const allSections = await jobService.getAllJobs();
-    const section = allSections.find(s => s.title === categoryTitle);
+    private async saveJobToDb(job: ParsedJob) {
+        const dateStr = job.importantDates;
 
-    if (section) return section;
+        const existingPost = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
+            .bind(job.applyLink)
+            .first();
+        if (!existingPost) {
+            await this.env.DB.prepare(`
+                INSERT INTO job_posts (title, category, short_info, important_dates, apply_link)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(job.title, job.category, job.shortInfo, dateStr, job.applyLink).run();
+        }
 
-    return { title: categoryTitle, color: 'gray', items: [] };
-  },
+        const id = job.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now().toString().slice(-4);
 
-  // Subscribe User
-  subscribeUser: async (userData: any): Promise<{ success: boolean; message: string; needsVerification?: boolean }> => {
-    try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-      const apiUrl = workerUrl ? `${workerUrl}/api/subscribe` : '/api/subscribe';
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json() as any;
-      return {
-        success: !!data.success,
-        message: data.message || 'Subscribed successfully!',
-        needsVerification: data.needsVerification,
-      };
-    } catch (error) {
-      console.error('Subscribe error:', error);
-      return { success: false, message: 'Subscription failed. Please try again.' };
+        await this.env.DB.prepare(`
+             INSERT INTO job_details (
+                id, title, category, post_date, short_info, 
+                important_dates, application_fee, age_limit, 
+                vacancy_details, important_links, apply_link, is_active
+             )
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `).bind(
+            id,
+            job.title,
+            job.category,
+            new Date().toLocaleDateString(),
+            job.shortInfo,
+            job.importantDates,   // Now stored as proper JSON string
+            job.applicationFee,   // New
+            job.ageLimit,         // New
+            job.vacancyDetails,   // New
+            job.importantLinks,   // New
+            job.applyLink
+        ).run();
     }
-  },
-
-  // Admin and other methods remain valid if they were using fetch already...
-  // Re-implementing them here to ensure full file replacement is correct.
-
-  postNewJob: async (
-    jobData: any,
-    adminPassword: string
-  ): Promise<{ success: boolean; message: string; notificationsSent?: number }> => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-    const response = await fetch(`${workerUrl}/api/admin/post-job`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminPassword}`,
-      },
-      body: JSON.stringify(jobData),
-    });
-    return await response.json() as { success: boolean; message: string; notificationsSent?: number };
-  },
-
-  getSubscribersCount: async (adminPassword: string) => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-    const response = await fetch(`${workerUrl}/api/admin/subscribers`, {
-      headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    const data = await response.json() as any;
-    return { total: data.totalSubscribers || 0, verified: data.verifiedSubscribers || 0 };
-  },
-
-  getAllDbJobs: async (adminPassword: string) => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-    const response = await fetch(`${workerUrl}/api/jobs`, {
-      headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    const data = await response.json() as any;
-    return data.jobs || [];
-  },
-
-  saveJob: async (
-    jobData: any,
-    adminPassword: string
-  ): Promise<{ success: boolean; message: string }> => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-    const response = await fetch(`${workerUrl}/api/admin/jobs`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminPassword}`,
-      },
-      body: JSON.stringify(jobData),
-    });
-    return await response.json() as { success: boolean; message: string };
-  },
-
-  deleteJob: async (
-    jobId: string,
-    adminPassword: string
-  ): Promise<{ success: boolean; message: string }> => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-    const response = await fetch(`${workerUrl}/api/admin/jobs/${jobId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    return await response.json() as { success: boolean; message: string };
-  }
-};
+}
