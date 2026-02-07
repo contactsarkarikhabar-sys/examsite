@@ -316,6 +316,28 @@ export class AutoAgent {
                 ? feesFound.map(f => `Fee: ${f}`)
                 : ["See Notification"];
 
+            const ageMinMatch = snippet.match(/(?:Min(?:imum)?\s*Age)\s*[:\-]?\s*(\d{1,2})/i);
+            const ageMaxMatch = snippet.match(/(?:Max(?:imum)?\s*Age)\s*[:\-]?\s*(\d{1,2})/i);
+            const ageLimitArr: string[] = [];
+            if (ageMinMatch) ageLimitArr.push(`Minimum Age: ${ageMinMatch[1]} Years`);
+            if (ageMaxMatch) ageLimitArr.push(`Maximum Age: ${ageMaxMatch[1]} Years`);
+            if (ageLimitArr.length === 0) ageLimitArr.push("As per rules");
+
+            const postName =
+                (snippet.match(/(?:post(?:s)?\s+of|recruitment\s+for|engagement\s+of|for\s+the\s+post\s+of)\s+([A-Za-z][A-Za-z\s\-\/&]+)/i)?.[1] || '')
+                    .trim() ||
+                (snippet.match(/\b(Jeep Driver|Driver|Clerk|Officer|Assistant|Engineer|Teacher|Nurse|Police|Constable|Inspector|Stenographer|Typist|Analyst|Apprentice|Junior|Senior)\b/i)?.[0] || 'Various Posts');
+            const totalPost =
+                (snippet.match(/total\s*posts?\s*[:\-]?\s*(\d{1,4})/i)?.[1] ||
+                 snippet.match(/\b(\d{1,4})\s+posts?\b/i)?.[1] || 'N/A');
+            const eligibilityKeywords = [
+                '10th', '12th', 'Matric', 'Intermediate', 'Graduate', 'Bachelor', 'Diploma', 'ITI',
+                'BTech', 'MTech', 'B.Sc', 'M.Sc', 'MBA', 'CA', 'LLB', 'BE', 'ME'
+            ];
+            const foundEligibility = eligibilityKeywords.filter(k => new RegExp(k.replace('.', '\\.'), 'i').test(snippet));
+            const eligibility = foundEligibility.length > 0 ? foundEligibility.join(' / ') : 'See Details';
+            const vacancyDetails = [{ postName, totalPost, eligibility }];
+
             return {
                 title: (function () {
                     const base = (result.title || '').trim()
@@ -341,8 +363,8 @@ export class AutoAgent {
                 shortInfo: snippet.length > 50 ? snippet : `${result.title} - Click to read more.`,
                 importantDates: JSON.stringify(importantDates),
                 applicationFee: JSON.stringify(applicationFee),
-                ageLimit: JSON.stringify(["As per rules"]),
-                vacancyDetails: JSON.stringify([{ postName: "Various Posts", totalPost: "N/A", eligibility: "See Details" }]),
+                ageLimit: JSON.stringify(ageLimitArr),
+                vacancyDetails: JSON.stringify(vacancyDetails),
                 importantLinks: JSON.stringify([{ label: "Source Link", url: result.link }]),
                 applyLink: result.link
             };
