@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Bell } from 'lucide-react';
-import { MARQUEE_TEXTS } from '../constants';
+import { MOCK_SECTIONS } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../utils/translations';
 import { SectionData } from '../types';
@@ -15,26 +15,26 @@ const Marquee: React.FC<MarqueeProps> = ({ onItemClick, sections = [] }) => {
   const t = translations[language];
 
   const items = useMemo(() => {
-    // If we have sections data, derive dynamic items
-    if (sections && sections.length > 0) {
-        const newUpdates = sections.find(s => s.title === 'New Updates')?.items || [];
-        const topOnline = sections.find(s => s.title === 'Top Online Form')?.items || [];
-        
-        const dynamicItems = [
-            ...newUpdates.slice(0, 6),
-            ...topOnline.slice(0, 4)
-        ].map(item => ({
-            text: item.title + (item.isNew ? ' 🔴' : ''), 
-            id: item.id
-        }));
+    // Use passed sections or fallback to MOCK_SECTIONS (which has IDs)
+    const sourceSections = (sections && sections.length > 0) ? sections : MOCK_SECTIONS;
+    
+    const newUpdates = sourceSections.find(s => s.title === 'New Updates')?.items || [];
+    const topOnline = sourceSections.find(s => s.title === 'Top Online Form')?.items || [];
+    
+    const dynamicItems = [
+        ...newUpdates.slice(0, 6),
+        ...topOnline.slice(0, 4)
+    ].map(item => ({
+        text: item.title + (item.isNew ? ' 🔴' : ''), 
+        id: item.id
+    }));
 
-        if (dynamicItems.length > 0) {
-            return dynamicItems;
-        }
+    if (dynamicItems.length > 0) {
+        return dynamicItems;
     }
     
-    // Fallback to static text if no data available
-    return MARQUEE_TEXTS.map(text => ({ text, id: undefined }));
+    // Ultimate fallback (should rarely be reached if MOCK_SECTIONS is valid)
+    return [{ text: "Welcome to ExamSite - Your Success Partner", id: undefined }];
   }, [sections]);
 
   return (
