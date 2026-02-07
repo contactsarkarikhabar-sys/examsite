@@ -40,6 +40,30 @@ const classifyJob = (job: JobDetailData): string => {
   return 'Top Online Form';
 };
 
+const deriveReadableTitle = (job: JobDetailData): string => {
+  const rawTitle = (job.title || '').trim();
+  const info = (job.shortInfo || '').trim();
+  const firstInfo = info.split(/[\n\.]/)[0].replace(/\s{2,}/g, ' ').trim();
+  const cleanedTitle = rawTitle
+    .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
+    .replace(/\s*\|\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (firstInfo && firstInfo.length > 10) {
+    return cleanedTitle ? `${firstInfo} — ${cleanedTitle}` : firstInfo;
+  }
+  try {
+    const url = job.importantLinks?.[0]?.url || '';
+    const host = url ? new URL(url).hostname : '';
+    const hostPart = host.split('.').filter(Boolean)[0] || '';
+    const org = hostPart ? hostPart.charAt(0).toUpperCase() + hostPart.slice(1) : '';
+    if (org && !/recruitment/i.test(rawTitle)) {
+      return `${rawTitle} — ${org}`;
+    }
+  } catch {}
+  return rawTitle;
+};
+
 // Initial Sections Structure (Clone from MOCK to keep colors/order AND items)
 const getInitialSections = (): SectionData[] => {
   // Deep copy to avoid mutating the original constant if we modify it later
@@ -80,7 +104,7 @@ export const jobService = {
             // Create Link Item
             const linkItem: JobLink = {
               id: job.id,
-              title: job.title,
+              title: deriveReadableTitle(job),
               isNew: true, // New jobs from DB are always "New"
               link: job.importantLinks?.[0]?.url || getSmartLink(job.title),
               lastDate: job.importantDates?.[1]
@@ -162,7 +186,9 @@ export const jobService = {
       if (!response.ok) throw new Error('Job not found');
 
       const data = await response.json() as { success: boolean, job: JobDetailData };
-      return data.job;
+      const job = data.job;
+      const readable = deriveReadableTitle(job);
+      return { ...job, title: readable };
 
     } catch (error) {
       console.warn('Job API failed, falling back to mock or smart generation', error);
