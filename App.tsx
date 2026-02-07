@@ -290,6 +290,45 @@ const App: React.FC = () => {
         setSearchQuery(query);
     };
 
+    // Marquee Click Handler
+    const handleMarqueeClick = (text: string, id?: string) => {
+        // If we have a direct job ID, navigate to it immediately
+        if (id) {
+            handleJobClick(id, text);
+            return;
+        }
+
+        // Fallback: Try to find a matching job in available sections
+        jobService.getAllJobs().then((allSections) => {
+             let foundJobId: string | null = null;
+             let foundJobTitle = '';
+
+             // Normalize for better matching
+             const cleanText = text.toLowerCase().replace(/\s+/g, ' ').trim();
+
+             for (const section of allSections) {
+                 for (const item of section.items) {
+                     const itemTitle = item.title.toLowerCase().replace(/\s+/g, ' ').trim();
+                     
+                     // Check for exact match or strong partial match
+                     if (itemTitle === cleanText || itemTitle.includes(cleanText) || cleanText.includes(itemTitle)) {
+                         foundJobId = item.id;
+                         foundJobTitle = item.title;
+                         break;
+                     }
+                 }
+                 if (foundJobId) break;
+             }
+
+             if (foundJobId) {
+                 handleJobClick(foundJobId, foundJobTitle);
+             } else {
+                 // Fallback to search if no direct job found
+                 handleSearch(text);
+             }
+        });
+    };
+
     // PWA Install handler
     const handleInstallApp = () => {
         if (deferredPrompt) {
@@ -328,7 +367,7 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-gray-100 font-sans">
             <Header onSearch={handleSearch} onNavigate={handleNavigate} onCategoryClick={handleViewMore} />
-            <Marquee onItemClick={handleSearch} />
+            <Marquee onItemClick={handleMarqueeClick} />
 
             <main className="container mx-auto px-4 py-6 flex-grow">
                 <Routes>
