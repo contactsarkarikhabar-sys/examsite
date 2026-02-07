@@ -273,8 +273,21 @@ export class AutoAgent {
             };
 
         } catch (e) {
-            console.warn(`Model ${targetModel} analysis failed:`, e);
-            throw e; // Throw to be caught by run() loop
+            console.warn(`All Gemini models failed. Using fallback data for: ${result.title}`, e);
+
+            // FALLBACK: Create a basic job entry from search result
+            // This ensures we at least save the job link and title
+            return {
+                title: result.title,
+                category: 'Other', // Default
+                shortInfo: result.snippet || 'Click Apply to see details.',
+                importantDates: JSON.stringify([]),
+                applicationFee: JSON.stringify([]),
+                ageLimit: JSON.stringify([]),
+                vacancyDetails: JSON.stringify([]),
+                importantLinks: JSON.stringify([{ label: 'Source Link', url: result.link }]),
+                applyLink: result.link
+            };
         }
     }
 
