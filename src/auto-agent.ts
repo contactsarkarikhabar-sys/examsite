@@ -257,6 +257,26 @@ export class AutoAgent {
 
             // Normalize fields to ensure strings for DB
             const sanitizeUrl = (u: string) => (u || '').replace(/`/g, '').trim();
+            const makeReadableTitle = (rawTitle: string, shortInfo: string, link: string) => {
+                const base = (rawTitle || '').trim()
+                    .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
+                    .replace(/\s*\|\s*/g, ' ')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+                const firstInfo = (shortInfo || '').split(/[\n\.]/)[0].replace(/\s{2,}/g, ' ').trim();
+                if (firstInfo && firstInfo.length > 10) {
+                    return base ? `${firstInfo} — ${base}` : firstInfo;
+                }
+                try {
+                    const host = new URL(link).hostname;
+                    const org = (host.split('.').filter(Boolean)[0] || '').replace(/-/g, ' ');
+                    const orgCap = org ? org.charAt(0).toUpperCase() + org.slice(1) : '';
+                    if (orgCap && !/recruitment/i.test(base)) {
+                        return base ? `${base} — ${orgCap}` : orgCap;
+                    }
+                } catch {}
+                return base || rawTitle;
+            };
             const links = Array.isArray(parsed.importantLinks)
                 ? parsed.importantLinks.map((l: any) => ({
                     label: String(l.label || 'Link'),
@@ -264,7 +284,7 @@ export class AutoAgent {
                 }))
                 : [{ label: "Apply Link", url: sanitizeUrl(result.link) }];
             return {
-                title: parsed.title || result.title,
+                title: makeReadableTitle(parsed.title || result.title, parsed.shortInfo || result.snippet, sanitizeUrl(result.link)),
                 category: parsed.category || 'Other',
                 shortInfo: parsed.shortInfo || result.snippet,
                 importantDates: JSON.stringify(parsed.importantDates || ["Check Notification"]),
@@ -297,7 +317,26 @@ export class AutoAgent {
                 : ["See Notification"];
 
             return {
-                title: result.title,
+                title: (function () {
+                    const base = (result.title || '').trim()
+                        .replace(/\b(news and notification|notifications?|vacancies?|vacancy notification|state of|recruitment\/engagement)\b/ig, '')
+                        .replace(/\s*\|\s*/g, ' ')
+                        .replace(/\s{2,}/g, ' ')
+                        .trim();
+                    const firstInfo = (snippet || '').split(/[\n\.]/)[0].replace(/\s{2,}/g, ' ').trim();
+                    if (firstInfo && firstInfo.length > 10) {
+                        return base ? `${firstInfo} — ${base}` : firstInfo;
+                    }
+                    try {
+                        const host = new URL(result.link || '').hostname;
+                        const org = (host.split('.').filter(Boolean)[0] || '').replace(/-/g, ' ');
+                        const orgCap = org ? org.charAt(0).toUpperCase() + org.slice(1) : '';
+                        if (orgCap && !/recruitment/i.test(base)) {
+                            return base ? `${base} — ${orgCap}` : orgCap;
+                        }
+                    } catch {}
+                    return base || result.title;
+                })(),
                 category: 'Other',
                 shortInfo: snippet.length > 50 ? snippet : `${result.title} - Click to read more.`,
                 importantDates: JSON.stringify(importantDates),
