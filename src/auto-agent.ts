@@ -177,54 +177,56 @@ export class AutoAgent {
             if (response.ok) {
                 const data = await response.json() as any;
                 const models = data.models.map((m: any) => m.name.split('/')[1]);
-                if (models.includes('gemini-1.5-pro')) {
-                    targetModel = 'gemini-1.5-pro';
-                }
+                // Prefer Pro if available, else Flash
+                if (models.includes('gemini-1.5-pro-latest')) targetModel = 'gemini-1.5-pro-latest';
+                else if (models.includes('gemini-1.5-pro')) targetModel = 'gemini-1.5-pro';
+                else if (models.includes('gemini-1.5-flash-latest')) targetModel = 'gemini-1.5-flash-latest';
             }
         } catch (e) {
-            console.warn('Failed to fetch Gemini model list, using default:', targetModel, e);
+            console.warn('Failed to fetch Gemini model list, using default:', targetModel);
         }
 
-        // 1. Deep Fetch: Try to get actual page content once
+        // 2. Fetch Page Content (Truncated)
         let pageContext = `Snippet: ${result.snippet}`;
         try {
-            console.log(`Fetching content for: ${result.link}`);
+            // console.log(`Fetching content for: ${result.link}`);
             const pageContent = await this.fetchPageContent(result.link);
             if (pageContent) {
-                // Truncate to avoid excessive tokens (approx 15k chars is safe for Flash model)
-                pageContext = `Full Page Content (Truncated): ${pageContent.slice(0, 15000)}`;
+                pageContext = `Full Page Content (Truncated to 10k chars): ${pageContent.slice(0, 10000)}`;
             }
         } catch (err) {
             console.warn(`Failed to fetch ${result.link}, using snippet only.`);
         }
 
         try {
-            console.log(`Trying Gemini Model: ${targetModel}`);
+            console.log(`Trying Gemini Model: ${targetModel} for ${result.title.substring(0, 20)}...`);
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${this.env.GEMINI_API_KEY}`;
 
             const promptText = `
-            Analyze this job notification to extract structured data.
+            You are an expert job data extractor.
+            Task: Extract structured job details from the provided text.
             
-            Source-1: Title: ${result.title}
-            Link: ${result.link}
-            Source-2: ${pageContext}
+            Source 1 (Title): ${result.title}
+            Source 2 (Link): ${result.link}
+            Source 3 (Content): ${pageContext}
 
-            STRICTLY FOLLOW THESE RULES:
-            1. **Extraction Goal**: Extract whatever information is available. If specific details (like Fee/Dates) are missing, use "Check Notification" or "N/A".
-            2. **Do NOT return null**: Always try to return a JSON object, even if data is sparse.
+            RULES:
+            1. **EXTRACT ANYTHING**: If exact dates/fees are missing, INFER them from context or use "Check Notification".
+            2. **DO NOT FAIL**: Mispelled words or partial data is OKAY. Return the best possible JSON.
+            3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, Other].
             
-            Return a JSON object with this exact schema:
+            Return ONLY a valid JSON object with this schema:
             {
-                "title": "Clean Job Title (e.g., SSC CGL 2025 Notification)",
-                "category": "One of [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Other]",
-                "shortInfo": "A detailed 2-3 line summary. If missing, summarize the title.",
-                "importantDates": ["Application Begin: Available Soon", "Last Date: Check Notification"], 
-                "applicationFee": ["See Notification"],
-                "ageLimit": ["See Notification"],
-                "vacancyDetails": [{"postName": "Various Posts", "totalPost": "See Notification", "eligibility": "See Notification"}],
+                "title": "Clean Job Title",
+                "category": "Category Name",
+                "shortInfo": "2-3 sentences summary",
+                "importantDates": ["Application Begin: DD/MM/YYYY", "Last Date: DD/MM/YYYY"], 
+                "applicationFee": ["General/OBC: ₹000", "SC/ST: ₹000"],
+                "ageLimit": ["Min: 18 Years", "Max: 30 Years"],
+                "vacancyDetails": [{"postName": "Post Name", "totalPost": "Number", "eligibility": "Degree/10th/12th"}],
                 "importantLinks": [
                     {"label": "Apply Online", "url": "${result.link}"},
-                    {"label": "Official Website", "url": "Extract from text if available"}
+                    {"label": "Official Website", "url": "Find in text or use ${result.link}"}
                 ]
             }
             `;
@@ -233,12 +235,8 @@ export class AutoAgent {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [{ text: promptText }]
-                    }],
-                    generationConfig: {
-                        response_mime_type: "application/json"
-                    }
+                    contents: [{ parts: [{ text: promptText }] }],
+                    generationConfig: { response_mime_type: "application/json" }
                 })
             });
 
@@ -255,34 +253,49 @@ export class AutoAgent {
             const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleanText);
 
-            if (!parsed.title) throw new Error("Gemini returned JSON without title");
-
+            // Normalize fields to ensure strings for DB
             return {
-                title: parsed.title,
+                title: parsed.title || result.title,
                 category: parsed.category || 'Other',
                 shortInfo: parsed.shortInfo || result.snippet,
-                importantDates: JSON.stringify(parsed.importantDates || []),
-                applicationFee: JSON.stringify(parsed.applicationFee || []),
-                ageLimit: JSON.stringify(parsed.ageLimit || []),
+                importantDates: JSON.stringify(parsed.importantDates || ["Check Notification"]),
+                applicationFee: JSON.stringify(parsed.applicationFee || ["See Notification"]),
+                ageLimit: JSON.stringify(parsed.ageLimit || ["See Notification"]),
                 vacancyDetails: JSON.stringify(parsed.vacancyDetails || []),
-                importantLinks: JSON.stringify(parsed.importantLinks || []),
-                applyLink: parsed.importantLinks?.find((l: any) => l.label.includes('Apply'))?.url || result.link
+                importantLinks: JSON.stringify(parsed.importantLinks || [{ label: "Apply Link", url: result.link }]),
+                applyLink: result.link
             };
 
         } catch (e) {
-            console.warn(`All Gemini models failed. Using fallback data for: ${result.title}`, e);
+            console.warn(`Gemini Failed for ${result.title}. Using SMART FALLBACK. Error: ${e}`);
 
-            // FALLBACK: Create a basic job entry from search result
-            // This ensures we at least save the job link and title
+            // === SMART FALLBACK (Regex Extraction) ===
+            const snippet = result.snippet || "";
+            const currentYear = new Date().getFullYear();
+
+            // Extract Dates (DD/MM/YYYY or DD-MM-YYYY)
+            const dateRegex = /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/g;
+            const datesFound = snippet.match(dateRegex) || [];
+            const importantDates = datesFound.length > 0
+                ? datesFound.map(d => `Date: ${d}`)
+                : [`Expected: ${currentYear}`];
+
+            // Extract Fees (₹ followed by digits)
+            const feeRegex = /(₹\s?\d+)/g;
+            const feesFound = snippet.match(feeRegex) || [];
+            const applicationFee = feesFound.length > 0
+                ? feesFound.map(f => `Fee: ${f}`)
+                : ["See Notification"];
+
             return {
                 title: result.title,
-                category: 'Other', // Default
-                shortInfo: result.snippet || 'Click Apply to see details.',
-                importantDates: JSON.stringify([]),
-                applicationFee: JSON.stringify([]),
-                ageLimit: JSON.stringify([]),
-                vacancyDetails: JSON.stringify([]),
-                importantLinks: JSON.stringify([{ label: 'Source Link', url: result.link }]),
+                category: 'Other',
+                shortInfo: snippet.length > 50 ? snippet : `${result.title} - Click to read more.`,
+                importantDates: JSON.stringify(importantDates),
+                applicationFee: JSON.stringify(applicationFee),
+                ageLimit: JSON.stringify(["As per rules"]),
+                vacancyDetails: JSON.stringify([{ postName: "Various Posts", totalPost: "N/A", eligibility: "See Details" }]),
+                importantLinks: JSON.stringify([{ label: "Source Link", url: result.link }]),
                 applyLink: result.link
             };
         }
