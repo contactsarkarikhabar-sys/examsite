@@ -117,7 +117,7 @@ const App: React.FC = () => {
                 onNavigate={handleNavigate}
                 onCategoryClick={handleViewMore}
             />
-            <Marquee />
+            <Marquee onItemClick={handleSearch} />
 
             <main className="container mx-auto px-4 py-6 flex-grow">
 
