@@ -50,21 +50,14 @@ export class AutoAgent {
 
             const { results, debug } = await this.searchSerpApi(query);
 
-            const debugInfo = {
-                ...debug,
-                apiKeys: {
-                    serp: !!this.env.SERP_API_KEY,
-                    gemini: !!this.env.GEMINI_API_KEY
-                },
-                skippedReasons: [] as string[]
-            };
+            const { results, debug } = await this.searchSerpApi(query);
 
             if (results.length === 0) {
                 return {
                     success: true,
                     message: `No new jobs found.`,
                     jobsAdded: 0,
-                    debug: debugInfo
+                    debug
                 };
             }
 
@@ -72,31 +65,12 @@ export class AutoAgent {
             let jobsAdded = 0;
             const uniqueResults = await this.filterExistingJobs(results);
 
-            // Get total count from DB for verification
-            const dbCountResult = await this.env.DB.prepare('SELECT COUNT(*) as count FROM job_posts').first();
-            const totalJobsInDb = dbCountResult ? dbCountResult.count : -1;
-
-            const extendedDebugInfo = {
-                ...debugInfo,
-                uniqueResultsCount: uniqueResults.length,
-                totalJobsInDb,
-                filteringMatches: results.length - uniqueResults.length
-            };
-
-            if (uniqueResults.length === 0) {
-                return {
-                    success: true,
-                    message: `Processed ${results.length} results. All ${results.length} were duplicates (already in DB).`,
-                    jobsAdded: 0,
-                    debug: extendedDebugInfo
-                };
-            }
-
             console.log(`Found ${uniqueResults.length} unique results to analyze.`);
+
+            const skippedReasons: string[] = [];
 
             for (const result of uniqueResults) {
                 console.log(`Analyzing: ${result.title}`);
-                // ... loop content ...
                 try {
                     const job = await this.analyzeWithGemini(result);
                     if (job) {
@@ -104,10 +78,10 @@ export class AutoAgent {
                         await this.saveJobToDb(job);
                         jobsAdded++;
                     } else {
-                        extendedDebugInfo.skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null, reason unknown)`);
+                        skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null)`);
                     }
                 } catch (e) {
-                    extendedDebugInfo.skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
+                    skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
                 }
             }
 
@@ -115,7 +89,14 @@ export class AutoAgent {
                 success: true,
                 message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
                 jobsAdded,
-                debug: extendedDebugInfo
+                debug: {
+                    query: serpDebug.query,
+                    url: serpDebug.url,
+                    status: serpDebug.status,
+                    dataSnippet: serpDebug.dataSnippet,
+                    uniqueResults: uniqueResults.length,
+                    skippedReasons
+                }
             };
 
         } catch (error) {
