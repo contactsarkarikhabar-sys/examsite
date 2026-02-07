@@ -45,8 +45,7 @@ export class AutoAgent {
             console.log('Starting AutoAgent run...');
             const currentYear = new Date().getFullYear();
 
-            // Strategy: Specific query for official government notifications
-            const query = `site:gov.in recruitment notification ${currentYear}`;
+            const query = `(site:gov.in OR site:nic.in) recruitment notification ${currentYear}`;
 
             const { results, debug } = await this.searchSerpApi(query);
 
@@ -121,7 +120,7 @@ export class AutoAgent {
 
         // SerpAPI Endpoint
         // Engine: google, google_domain: google.co.in, gl: in (India)
-        const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${this.env.SERP_API_KEY}&num=5&google_domain=google.co.in&gl=in`;
+        const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${this.env.SERP_API_KEY}&num=10&google_domain=google.co.in&gl=in&tbs=qdr:w`;
         debug.url = url.replace(this.env.SERP_API_KEY, 'HIDDEN_KEY');
 
         console.log('Fetching SerpAPI...');
@@ -150,18 +149,16 @@ export class AutoAgent {
     }
 
     private async filterExistingJobs(results: SearchResult[]): Promise<SearchResult[]> {
-        const uniqueResults = [];
+        const uniqueResults: SearchResult[] = [];
         for (const result of results) {
-            let exists: any = null;
-            try {
-                exists = await this.env.DB.prepare('SELECT id FROM job_details WHERE apply_link = ?')
-                    .bind(result.link)
-                    .first();
-            } catch (e) {
-                exists = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
-                    .bind(result.link)
-                    .first();
-            }
+            const byLink = await this.env.DB.prepare('SELECT id FROM job_details WHERE apply_link = ?')
+                .bind(result.link)
+                .first();
+            const byTitle = await this.env.DB.prepare('SELECT id FROM job_details WHERE title = ?')
+                .bind(result.title)
+                .first();
+            const exists = byLink || byTitle;
+            console.log(`Dedup check: title="${result.title}" link="${result.link}" exists=${!!exists}`);
             if (!exists) {
                 uniqueResults.push(result);
             }
@@ -259,6 +256,13 @@ export class AutoAgent {
             const parsed = JSON.parse(cleanText);
 
             // Normalize fields to ensure strings for DB
+            const sanitizeUrl = (u: string) => (u || '').replace(/`/g, '').trim();
+            const links = Array.isArray(parsed.importantLinks)
+                ? parsed.importantLinks.map((l: any) => ({
+                    label: String(l.label || 'Link'),
+                    url: sanitizeUrl(String(l.url || result.link))
+                }))
+                : [{ label: "Apply Link", url: sanitizeUrl(result.link) }];
             return {
                 title: parsed.title || result.title,
                 category: parsed.category || 'Other',
@@ -267,8 +271,8 @@ export class AutoAgent {
                 applicationFee: JSON.stringify(parsed.applicationFee || ["See Notification"]),
                 ageLimit: JSON.stringify(parsed.ageLimit || ["See Notification"]),
                 vacancyDetails: JSON.stringify(parsed.vacancyDetails || []),
-                importantLinks: JSON.stringify(parsed.importantLinks || [{ label: "Apply Link", url: result.link }]),
-                applyLink: result.link
+                importantLinks: JSON.stringify(links),
+                applyLink: sanitizeUrl(result.link)
             };
 
         } catch (e) {
