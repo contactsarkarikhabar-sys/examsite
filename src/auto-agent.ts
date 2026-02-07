@@ -72,10 +72,31 @@ export class AutoAgent {
             let jobsAdded = 0;
             const uniqueResults = await this.filterExistingJobs(results);
 
+            // Get total count from DB for verification
+            const dbCountResult = await this.env.DB.prepare('SELECT COUNT(*) as count FROM job_posts').first();
+            const totalJobsInDb = dbCountResult ? dbCountResult.count : -1;
+
+            const extendedDebugInfo = {
+                ...debugInfo,
+                uniqueResultsCount: uniqueResults.length,
+                totalJobsInDb,
+                filteringMatches: results.length - uniqueResults.length
+            };
+
+            if (uniqueResults.length === 0) {
+                return {
+                    success: true,
+                    message: `Processed ${results.length} results. All ${results.length} were duplicates (already in DB).`,
+                    jobsAdded: 0,
+                    debug: extendedDebugInfo
+                };
+            }
+
             console.log(`Found ${uniqueResults.length} unique results to analyze.`);
 
             for (const result of uniqueResults) {
                 console.log(`Analyzing: ${result.title}`);
+                // ... loop content ...
                 try {
                     const job = await this.analyzeWithGemini(result);
                     if (job) {
@@ -83,10 +104,10 @@ export class AutoAgent {
                         await this.saveJobToDb(job);
                         jobsAdded++;
                     } else {
-                        debugInfo.skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null, reason unknown)`);
+                        extendedDebugInfo.skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null, reason unknown)`);
                     }
                 } catch (e) {
-                    debugInfo.skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
+                    extendedDebugInfo.skippedReasons.push(`Error: ${result.title.substring(0, 30)}... (${e instanceof Error ? e.message : String(e)})`);
                 }
             }
 
@@ -94,7 +115,7 @@ export class AutoAgent {
                 success: true,
                 message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
                 jobsAdded,
-                debug: debugInfo
+                debug: extendedDebugInfo
             };
 
         } catch (error) {
