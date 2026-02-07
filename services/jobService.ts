@@ -40,13 +40,10 @@ const classifyJob = (job: JobDetailData): string => {
   return 'Top Online Form';
 };
 
-// Initial Sections Structure (Clone from MOCK to keep colors/order)
+// Initial Sections Structure (Clone from MOCK to keep colors/order AND items)
 const getInitialSections = (): SectionData[] => {
-  return MOCK_SECTIONS.map(s => ({
-    title: s.title,
-    color: s.color,
-    items: []
-  }));
+  // Deep copy to avoid mutating the original constant if we modify it later
+  return JSON.parse(JSON.stringify(MOCK_SECTIONS));
 };
 
 export const jobService = {
@@ -54,62 +51,60 @@ export const jobService = {
   getAllJobs: async (): Promise<SectionData[]> => {
     try {
       const workerUrl = import.meta.env.VITE_WORKER_URL || '';
-      // If running locally without env, it might be empty. Fallback or relative path if proxied?
-      // For now, assuming relative path '/api' works if served from same origin, or full URL if env set.
       const apiUrl = workerUrl ? `${workerUrl}/api/jobs` : '/api/jobs';
 
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error('Failed to fetch jobs');
-
-      const data = await response.json() as { success: boolean, jobs: JobDetailData[] };
-      const jobs = data.jobs || [];
-
-      // Initialize Sections
+      // Start with Mock Data (Hybrid Approach)
       const sections = getInitialSections();
-      const newUpdatesItems: JobLink[] = [];
 
-      // Sort jobs by ID desc (proxy for date) or distinct date field if available
-      // Assuming ID structure allows some chronological sorting or just reverse list
-      // The API sorts by updated_at DESC, so we can iterate.
+      try {
+        const response = await fetch(apiUrl);
+        if (response.ok) {
+          const data = await response.json() as { success: boolean, jobs: JobDetailData[] };
+          const jobs = data.jobs || [];
 
-      jobs.forEach(job => {
-        // Create Link Item
-        const linkItem: JobLink = {
-          id: job.id,
-          title: job.title,
-          isNew: true, // You might want logic here: e.g. within last 7 days
-          link: job.importantLinks?.[0]?.url || getSmartLink(job.title),
-          lastDate: job.importantDates?.[1] // Approximating "Last Date" from index 1 if exists
-        };
+          const newUpdatesItems: JobLink[] = [];
 
-        // 1. Add to classified section
-        const sectionTitle = classifyJob(job);
-        const section = sections.find(s => s.title === sectionTitle);
-        if (section) {
-          section.items.push(linkItem);
-        } else {
-          // Fallback to 'Other Online Form' if category not found
-          const otherSection = sections.find(s => s.title === 'Other Online Form');
-          otherSection?.items.push(linkItem);
+          jobs.forEach(job => {
+            // Create Link Item
+            const linkItem: JobLink = {
+              id: job.id,
+              title: job.title,
+              isNew: true, // New jobs from DB are always "New"
+              link: job.importantLinks?.[0]?.url || getSmartLink(job.title),
+              lastDate: job.importantDates?.[1]
+            };
+
+            // 1. Add to classified section
+            const sectionTitle = classifyJob(job);
+            const section = sections.find(s => s.title === sectionTitle);
+            if (section) {
+              // Prepend to show at top
+              section.items.unshift(linkItem);
+            } else {
+              const otherSection = sections.find(s => s.title === 'Other Online Form');
+              otherSection?.items.unshift(linkItem);
+            }
+
+            // 2. Add to "New Updates" (Top 15 candidate)
+            newUpdatesItems.push(linkItem);
+          });
+
+          // Prepend new updates to the existing "New Updates" section
+          const newUpdatesSection = sections.find(s => s.title === "New Updates");
+          if (newUpdatesSection) {
+            // Add new DB jobs to the top of New Updates
+            newUpdatesSection.items = [...newUpdatesItems, ...newUpdatesSection.items];
+          }
         }
-
-        // 2. Add to "New Updates" (Top 15)
-        if (newUpdatesItems.length < 15) {
-          newUpdatesItems.push(linkItem);
-        }
-      });
-
-      // Special handling: "New Updates" section needs to be populated explicitly
-      const newUpdatesSection = sections.find(s => s.title === "New Updates");
-      if (newUpdatesSection) {
-        newUpdatesSection.items = newUpdatesItems;
+      } catch (err) {
+        console.warn('API fetch failed, showing only mock data', err);
       }
 
       return sections;
 
     } catch (error) {
-      console.error('API Fetch failed, using Mock Data:', error);
-      return new Promise((resolve) => setTimeout(() => resolve(MOCK_SECTIONS), DELAY));
+      console.error('Critical error in getAllJobs:', error);
+      return MOCK_SECTIONS;
     }
   },
 
