@@ -152,12 +152,17 @@ export class AutoAgent {
     private async filterExistingJobs(results: SearchResult[]): Promise<SearchResult[]> {
         const uniqueResults = [];
         for (const result of results) {
-            // Check if link exists in DB
-            const existing = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
-                .bind(result.link)
-                .first();
-
-            if (!existing) {
+            let exists: any = null;
+            try {
+                exists = await this.env.DB.prepare('SELECT id FROM job_details WHERE apply_link = ?')
+                    .bind(result.link)
+                    .first();
+            } catch (e) {
+                exists = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
+                    .bind(result.link)
+                    .first();
+            }
+            if (!exists) {
                 uniqueResults.push(result);
             }
         }
@@ -329,18 +334,18 @@ export class AutoAgent {
     }
 
     private async saveJobToDb(job: ParsedJob) {
-        // 1. Insert into job_posts
-        // Convert JSON string back to array-string for job_posts table (legacy compatibility if needed)
-        // Or just use the string directly if schema supports text.
-        // Assuming job_posts.important_dates is TEXT.
         const dateStr = job.importantDates;
 
-        await this.env.DB.prepare(`
-            INSERT INTO job_posts (title, category, short_info, important_dates, apply_link)
-            VALUES (?, ?, ?, ?, ?)
-        `).bind(job.title, job.category, job.shortInfo, dateStr, job.applyLink).run();
+        const existingPost = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
+            .bind(job.applyLink)
+            .first();
+        if (!existingPost) {
+            await this.env.DB.prepare(`
+                INSERT INTO job_posts (title, category, short_info, important_dates, apply_link)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(job.title, job.category, job.shortInfo, dateStr, job.applyLink).run();
+        }
 
-        // 2. Insert into job_details
         const id = job.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now().toString().slice(-4);
 
         await this.env.DB.prepare(`
