@@ -736,6 +736,43 @@ export default {
             return handleGetSubscribers(request, env);
         }
 
+        if (path === '/api/admin/cleanup-junk' && (request.method === 'POST' || request.method === 'GET')) {
+            const origin = request.headers.get('Origin');
+            const authHeader = request.headers.get('Authorization');
+            const queryKey = new URL(request.url).searchParams.get('key');
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+            try {
+                await env.DB.prepare(`
+                    UPDATE job_details
+                    SET is_active = 0, updated_at = datetime('now')
+                    WHERE is_active = 1 AND (
+                        title LIKE '%http%' OR
+                        title LIKE '%www.%' OR
+                        title LIKE 'Vacancy%' OR
+                        title LIKE 'Engagement%' OR
+                        title LIKE 'Recruitment%' OR
+                        title LIKE 'Notification%' OR
+                        title LIKE '%DATED%' OR
+                        title LIKE 'No.%'
+                    )
+                `).run();
+                return jsonResponse({ success: true, message: 'Cleanup applied' }, 200, origin);
+            } catch (error) {
+                return errorResponse('Cleanup failed', 500, origin);
+            }
+        }
+
         if (path === '/api/admin/ping' && request.method === 'GET') {
             const queryKey = url.searchParams.get('key');
             const authHeader = request.headers.get('Authorization');
@@ -912,9 +949,19 @@ export default {
             try {
                 const info = await env.DB.prepare('PRAGMA table_info(job_details)').all();
                 const hasApplyLink = (info.results || []).some((r: any) => r.name === 'apply_link');
+                const hasSourceUrl = (info.results || []).some((r: any) => r.name === 'source_url');
+                const hasSourceDomain = (info.results || []).some((r: any) => r.name === 'source_domain');
                 let applied = false;
                 if (!hasApplyLink) {
                     await env.DB.prepare('ALTER TABLE job_details ADD COLUMN apply_link TEXT').run();
+                    applied = true;
+                }
+                if (!hasSourceUrl) {
+                    await env.DB.prepare('ALTER TABLE job_details ADD COLUMN source_url TEXT').run();
+                    applied = true;
+                }
+                if (!hasSourceDomain) {
+                    await env.DB.prepare('ALTER TABLE job_details ADD COLUMN source_domain TEXT').run();
                     applied = true;
                 }
                 return jsonResponse({ success: true, applied }, 200, origin);
@@ -922,6 +969,27 @@ export default {
                 console.error('Migration error:', error);
                 return errorResponse('Migration failed', 500, origin);
             }
+        }
+
+        if (path === '/api/admin/pending' && request.method === 'GET') {
+            const origin = request.headers.get('Origin');
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+            const rows = await env.DB.prepare(`SELECT id, title, post_date FROM job_details WHERE is_active = 0 ORDER BY updated_at DESC`).all();
+            return jsonResponse({ success: true, pending: rows.results || [] }, 200, origin);
+        }
+
+        if (path.startsWith('/api/admin/approve/') && request.method === 'POST') {
+            const origin = request.headers.get('Origin');
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+            const jobId = path.replace('/api/admin/approve/', '');
+            await env.DB.prepare(`UPDATE job_details SET is_active = 1, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
+            return jsonResponse({ success: true, message: 'Approved' }, 200, origin);
         }
 
         // Job Details CRUD Routes

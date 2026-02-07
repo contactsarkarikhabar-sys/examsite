@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS job_details (
     vacancy_details TEXT,  -- JSON array of objects
     important_links TEXT,  -- JSON array of objects
     apply_link TEXT,
+    source_url TEXT,
+    source_domain TEXT,
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))

@@ -29,7 +29,7 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [activeTab, setActiveTab] = useState<'quick' | 'full'>('quick');
+    const [activeTab, setActiveTab] = useState<'quick' | 'full' | 'pending'>('quick');
 
     // Stats
     const [stats, setStats] = useState({ total: 0, verified: 0 });
@@ -49,6 +49,7 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedJobId, setSelectedJobId] = useState('');
     const [searchFilter, setSearchFilter] = useState('');
+    const [pendingJobs, setPendingJobs] = useState<Array<{ id: string; title: string; post_date?: string }>>([]);
 
     // Get job list from constants
     const jobList = Object.keys(JOB_DETAILS_DB).map(id => ({ id, title: JOB_DETAILS_DB[id].title }));
@@ -65,9 +66,20 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         }
     }, [isAuthenticated, isOpen]);
 
+    useEffect(() => {
+        if (isAuthenticated && isOpen && activeTab === 'pending') {
+            loadPending();
+        }
+    }, [isAuthenticated, isOpen, activeTab]);
+
     const loadStats = async () => {
         const data = await jobService.getSubscribersCount(password);
         setStats({ total: data.total, verified: data.verified });
+    };
+
+    const loadPending = async () => {
+        const rows = await jobService.getPendingJobs(password);
+        setPendingJobs(rows);
     };
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -349,6 +361,34 @@ ${detailsCode}
         setSearchFilter('');
     };
 
+    const handleCleanupJunk = async () => {
+        setIsLoading(true);
+        setMessage(null);
+        const result = await jobService.cleanupJunkJobs(password);
+        setIsLoading(false);
+        if (result.success) {
+            setMessage({ type: 'success', text: '✅ Junk jobs cleaned' });
+            if (activeTab === 'pending') {
+                loadPending();
+            }
+        } else {
+            setMessage({ type: 'error', text: result.message || 'Cleanup failed' });
+        }
+    };
+
+    const handleApprove = async (jobId: string) => {
+        setIsLoading(true);
+        setMessage(null);
+        const result = await jobService.approveJob(jobId, password);
+        setIsLoading(false);
+        if (result.success) {
+            setMessage({ type: 'success', text: '✅ Approved' });
+            loadPending();
+        } else {
+            setMessage({ type: 'error', text: result.message || 'Approve failed' });
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -431,6 +471,12 @@ ${detailsCode}
                                     className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition ${activeTab === 'full' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                                 >
                                     📝 Full Job Details
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('pending')}
+                                    className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition ${activeTab === 'pending' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                >
+                                    ✅ Pending
                                 </button>
                             </div>
 
@@ -861,6 +907,46 @@ ${detailsCode}
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'pending' && (
+                                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                                    <div className="flex items-center justify-between gap-3 mb-4">
+                                        <h4 className="font-bold text-gray-800">Pending approvals</h4>
+                                        <button
+                                            type="button"
+                                            onClick={handleCleanupJunk}
+                                            disabled={isLoading}
+                                            className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
+                                        >
+                                            {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                                            Cleanup junk
+                                        </button>
+                                    </div>
+
+                                    {pendingJobs.length === 0 ? (
+                                        <div className="text-sm text-gray-600">No pending jobs.</div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {pendingJobs.slice(0, 50).map(j => (
+                                                <div key={j.id} className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg p-3">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-sm font-bold text-gray-800 truncate">{j.title}</div>
+                                                        <div className="text-xs text-gray-500 truncate">{j.id}{j.post_date ? ` • ${j.post_date}` : ''}</div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleApprove(j.id)}
+                                                        disabled={isLoading}
+                                                        className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-2 px-3 rounded-lg text-sm"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </>

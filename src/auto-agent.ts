@@ -34,6 +34,45 @@ export class AutoAgent {
         this.env = env;
     }
 
+    private isAllowedSourceUrl(link: string, title: string, snippet: string): boolean {
+        const text = `${title || ''} ${snippet || ''}`.toLowerCase();
+        const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'ntpc', 'alp', 'group d', 'ibps', 'sbi', 'rbi', 'lic', 'afcat', 'agniveer',
+            'uppsc', 'upsssc', 'rpsc', 'rsmssb', 'bpsc', 'mppsc', 'wbpsc', 'dsssb', 'psssb', 'uksssc', 'cgpsc', 'mpesb', 'csbc'
+        ];
+        const hasKeyword = keywords.some(k => text.includes(k));
+        try {
+            const url = new URL(link);
+            const host = url.hostname.toLowerCase();
+            const path = url.pathname.toLowerCase();
+            const knownBoards = [
+                'ssc.gov.in',
+                'upsc.gov.in',
+                'indianrailways.gov.in',
+                'ibps.in',
+                'sbi.co.in',
+                'opportunities.rbi.org.in',
+                'rbi.org.in',
+                'licindia.in',
+                'afcat.cdac.in',
+                'agnipathvayu.cdac.in',
+                'joinindianarmy.nic.in',
+                'joinindiannavy.gov.in',
+                'csbc.bih.nic.in',
+                'uppbpb.gov.in',
+                'upsssc.gov.in',
+                'uppsc.up.nic.in'
+            ];
+            const isKnownBoard = knownBoards.some(d => host === d || host.endsWith(`.${d}`));
+            if (isKnownBoard) return true;
+            const isGov = host.endsWith('.gov.in') || host.endsWith('.nic.in');
+            const recruitmentPath = /(recruit|career|vacanc|notification|advertis|employment|jobs?)/i.test(path);
+            if (isGov && hasKeyword && recruitmentPath) return true;
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
     private isClaritySufficient(job: ParsedJob): boolean {
         const title = (job.title || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
         const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
@@ -54,13 +93,22 @@ export class AutoAgent {
         const actionOnly = isActionOnlyTitle(rawTitle);
         const noticeLike = /\bno\.\s*\d|\bdated\b/i.test(rawTitle) || /\bno\.\s*\d|\bdated\b/i.test(info);
         const likelyNotExam = noticeLike && !hasKeyword && !domainOk;
+        const normalizedTitle = deriveReadableTitle({
+            title: rawTitle,
+            shortInfo: job.shortInfo,
+            importantDates: (() => { try { return JSON.parse(job.importantDates || '[]'); } catch { return []; } })(),
+            importantLinks: (() => { try { return JSON.parse(job.importantLinks || '[]'); } catch { return []; } })(),
+            applyLink: job.applyLink
+        });
+        const normalizedBad = normalizedTitle.toLowerCase() === 'job notification' || /\(\s*\)/.test(normalizedTitle) || normalizedTitle.length < 16;
         return (
             !genericHeadBad &&
             !looksLikeUrl &&
             !hasQueryNoise &&
             !actionOnly &&
             !likelyNotExam &&
-            (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk) &&
+            !normalizedBad &&
+            (titleLen >= 20 || infoLen >= 40 || hasKeyword) &&
             hasLink
         );
     }
@@ -94,6 +142,10 @@ export class AutoAgent {
             for (const result of uniqueResults) {
                 console.log(`Analyzing: ${result.title}`);
                 try {
+                    if (!this.isAllowedSourceUrl(result.link, result.title, result.snippet)) {
+                        skippedReasons.push(`Blocked source: ${result.title.substring(0, 40)}... from ${result.link}`);
+                        continue;
+                    }
                     const job = await this.analyzeWithGemini(result);
                     if (job) {
                         if (this.isClaritySufficient(job)) {
@@ -427,7 +479,7 @@ export class AutoAgent {
                 important_dates, application_fee, age_limit, 
                 vacancy_details, important_links, apply_link, is_active
              )
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         `).bind(
             id,
             job.title,
@@ -441,5 +493,12 @@ export class AutoAgent {
             job.importantLinks,   // New
             job.applyLink
         ).run();
+
+        try {
+            const host = new URL(job.applyLink).hostname;
+            await this.env.DB.prepare(`UPDATE job_details SET source_url = ?, source_domain = ?, updated_at = datetime('now') WHERE id = ?`)
+                .bind(job.applyLink, host, id)
+                .run();
+        } catch {}
     }
 }
