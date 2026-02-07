@@ -464,7 +464,8 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
         const jobs = await env.DB.prepare('SELECT * FROM job_details WHERE is_active = 1 ORDER BY updated_at DESC')
             .all();
 
-        const parsedJobs = (jobs.results || []).map((row: any) => {
+        const parsedJobs = (jobs.results || [])
+            .map((row: any) => {
             const importantDates = JSON.parse(row.important_dates || '[]');
             const applicationFee = JSON.parse(row.application_fee || '[]');
             const ageLimit = JSON.parse(row.age_limit || '[]');
@@ -481,13 +482,17 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
                 url: String(l?.url || '').replace(/`/g, '').trim()
             }));
             const applyLink = String(row.apply_link || '');
-            const title = deriveReadableTitle({
+            const rawJob = {
                 title: String(row.title || ''),
                 shortInfo: String(row.short_info || ''),
                 importantDates,
                 importantLinks,
                 applyLink
-            });
+            };
+            if (!isDisplayableJob(rawJob)) {
+                return null;
+            }
+            const title = deriveReadableTitle(rawJob);
             return {
                 id: String(row.id || ''),
                 title,
@@ -501,7 +506,8 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
                 importantLinks,
                 applyLink
             };
-        }).filter((job: any) => isDisplayableJob(job));
+        })
+            .filter(Boolean);
 
         return jsonResponse({ success: true, jobs: parsedJobs, count: parsedJobs.length }, 200, origin);
     } catch (error) {

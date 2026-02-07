@@ -1,5 +1,5 @@
 // ExamSite.in Service Worker for PWA
-const CACHE_NAME = 'examsite-v1';
+const CACHE_NAME = 'examsite-v2';
 const urlsToCache = [
     '/',
     '/index.html',
