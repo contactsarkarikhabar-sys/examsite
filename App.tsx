@@ -54,7 +54,6 @@ const HomePage: React.FC<{
         };
         runSearch();
     }, [searchQuery]);
-
     const topSections = useMemo(() => sections.filter(s => ['New Updates', 'Top Online Form'].includes(s.title)), [sections]);
     const gridSections = useMemo(() => sections.filter(s => !['New Updates', 'Top Online Form'].includes(s.title)), [sections]);
 
