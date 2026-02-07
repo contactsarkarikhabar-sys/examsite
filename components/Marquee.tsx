@@ -1,27 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { MARQUEE_TEXTS } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../utils/translations';
-import { jobService } from '../services/jobService';
+import { SectionData } from '../types';
 
 interface MarqueeProps {
   onItemClick?: (text: string, id?: string) => void;
+  sections?: SectionData[];
 }
 
-const Marquee: React.FC<MarqueeProps> = ({ onItemClick }) => {
+const Marquee: React.FC<MarqueeProps> = ({ onItemClick, sections = [] }) => {
   const { language } = useLanguage();
   const t = translations[language];
-  const [items, setItems] = useState<{text: string, id?: string}[]>([]);
 
-  useEffect(() => {
-    const fetchMarqueeData = async () => {
-      try {
-        const sections = await jobService.getAllJobs();
+  const items = useMemo(() => {
+    // If we have sections data, derive dynamic items
+    if (sections && sections.length > 0) {
         const newUpdates = sections.find(s => s.title === 'New Updates')?.items || [];
         const topOnline = sections.find(s => s.title === 'Top Online Form')?.items || [];
         
-        // Combine top items from important sections
         const dynamicItems = [
             ...newUpdates.slice(0, 6),
             ...topOnline.slice(0, 4)
@@ -31,17 +29,13 @@ const Marquee: React.FC<MarqueeProps> = ({ onItemClick }) => {
         }));
 
         if (dynamicItems.length > 0) {
-            setItems(dynamicItems);
-        } else {
-            setItems(MARQUEE_TEXTS.map(text => ({ text })));
+            return dynamicItems;
         }
-      } catch (error) {
-        setItems(MARQUEE_TEXTS.map(text => ({ text })));
-      }
-    };
-
-    fetchMarqueeData();
-  }, []);
+    }
+    
+    // Fallback to static text if no data available
+    return MARQUEE_TEXTS.map(text => ({ text, id: undefined }));
+  }, [sections]);
 
   return (
     <div className="bg-yellow-400 border-b border-yellow-500 overflow-hidden flex items-center h-10 shadow-sm relative z-30">

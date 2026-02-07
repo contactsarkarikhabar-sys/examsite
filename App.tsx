@@ -367,7 +367,7 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-gray-100 font-sans">
             <Header onSearch={handleSearch} onNavigate={handleNavigate} onCategoryClick={handleViewMore} />
-            <Marquee onItemClick={handleMarqueeClick} />
+            <Marquee onItemClick={handleMarqueeClick} sections={sections} />
 
             <main className="container mx-auto px-4 py-6 flex-grow">
                 <Routes>
