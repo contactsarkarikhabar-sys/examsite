@@ -164,7 +164,7 @@ const isDisplayableJob = (job: JobDetailData): boolean => {
   const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
   const titleLen = title.length;
   const infoLen = info.length;
-  const genericHead = /^(recruitment|vacancies|vacancy notification|notification|news and notification|recruitment\/engagement)\b/i.test(rawTitle);
+  const genericHead = /^(recruitment|vacancies|vacancy notification|notification|news and notification|recruitment\/engagement|online form|vacancy\s*(?:&|and)\s*online form)\b/i.test(rawTitle.toLowerCase());
   const looksLikeUrl = /^https?:\/\//i.test(rawTitle) || /https?:\/\//i.test(info);
   const hasQueryNoise = /(\bkey=|utm_|ref=)/i.test(rawTitle) || /(\bkey=|utm_|ref=)/i.test(info);
   const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice',
@@ -178,7 +178,9 @@ const isDisplayableJob = (job: JobDetailData): boolean => {
     domainOk = /\.(gov\.in|nic\.in)$/.test(host) || /upsc\.gov\.in|ssc\.gov\.in|ibps\.in|sbi\.co\.in|rbi\.org\.in/.test(host);
   } catch {}
   const hasLink = !!(job.importantLinks?.[0]?.url);
-  return (!genericHead && !looksLikeUrl && !hasQueryNoise && (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk)) && hasLink;
+  const derived = deriveReadableTitle(job).toLowerCase();
+  const actionOnly = /^(online form|online application status|vacancy\s*(?:&|and)\s*online form|vacancy)$/i.test(derived);
+  return (!genericHead && !looksLikeUrl && !hasQueryNoise && !actionOnly && (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk)) && hasLink;
 };
 
 // Initial Sections Structure (Clone from MOCK to keep colors/order AND items)
