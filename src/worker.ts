@@ -657,8 +657,10 @@ export default {
             return handleGetSubscribers(request, env);
         }
 
-        // Manual Agent Trigger (Admin Only)
-        if (path === '/api/admin/trigger-agent' && request.method === 'POST') {
+        // Manual Agent Trigger (Admin Only) - Enhanced for Browser usage
+        if ((path === '/api/admin/trigger-agent' || path === '/api/debug/trigger') && (request.method === 'POST' || request.method === 'GET')) {
+            const url = new URL(request.url);
+            const queryKey = url.searchParams.get('key');
             const authHeader = request.headers.get('Authorization');
 
             // Check if ADMIN_PASSWORD is set
@@ -666,8 +668,16 @@ export default {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
 
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
-                return errorResponse('Unauthorized', 401, origin);
+            // Verify Auth (Header OR Query Param)
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized. Use ?key=YOUR_ADMIN_PASSWORD', 401, origin);
             }
 
             try {
