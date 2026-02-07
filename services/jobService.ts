@@ -128,6 +128,13 @@ export const jobService = {
 
   // Get Detailed Job Info
   getJobDetail: async (id: string, title?: string): Promise<JobDetailData> => {
+    // 1. Check if it's a mock job in our extensive internal DB
+    // This ensures rich details for "static" jobs even if API is down or empty
+    const { JOB_DETAILS_DB } = await import('../constants'); // Dynamic import to avoid circular dependency issues if any
+    if (JOB_DETAILS_DB[id]) {
+      return JOB_DETAILS_DB[id];
+    }
+
     try {
       const workerUrl = import.meta.env.VITE_WORKER_URL || '';
       const apiUrl = workerUrl ? `${workerUrl}/api/jobs/${id}` : `/api/jobs/${id}`;
