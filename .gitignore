@@ -27,3 +27,9 @@ yarn-error.log*
 
 # Wrangler local config with secrets (NEVER COMMIT)
 wrangler.local.jsonc
+
+# Wrangler build artifacts (ignore local temp bundles)
+.wrangler/tmp
+
+# Wrangler local state (never commit)
+.wrangler/

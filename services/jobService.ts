@@ -1,5 +1,6 @@
 import { SectionData, JobDetailData, JobLink } from '../types';
 import { MOCK_SECTIONS } from '../constants';
+import { deriveReadableTitle, isDisplayableJob } from '../shared/jobTitle';
 
 // Simulated latency (optional, can be removed)
 const DELAY = 100;
@@ -19,6 +20,34 @@ const getSmartLink = (title: string): string => {
   if (t.includes('airforce') || t.includes('afcat')) return "https://agnipathvayu.cdac.in/";
   if (t.includes('navy')) return "https://www.joinindiannavy.gov.in/";
   if (t.includes('army') || t.includes('agniveer')) return "https://joinindianarmy.nic.in/";
+  // --- State PSC / SSSC Common Official Portals ---
+  if (t.includes('uppsc')) return "https://uppsc.up.nic.in/";
+  if (t.includes('upsssc')) return "https://upsssc.gov.in/";
+  if (t.includes('rpsc')) return "https://rpsc.rajasthan.gov.in/";
+  if (t.includes('rsmssb') || t.includes('rssb')) return "https://rsmssb.rajasthan.gov.in/";
+  if (t.includes('mppsc')) return "https://mppsc.mp.gov.in/";
+  if (t.includes('bpsc')) return "https://www.bpsc.bih.nic.in/";
+  if (t.includes('wbpsc')) return "https://wbpsc.gov.in/";
+  if (t.includes('jkpsc')) return "https://jkpsc.nic.in/";
+  if (t.includes('jpsc')) return "https://www.jpsc.gov.in/";
+  if (/\bmpsc\b/.test(t) || (t.includes('maharashtra') && t.includes('psc'))) return "https://mpsc.gov.in/";
+  if (t.includes('kpsc')) return "https://www.kpsc.kar.nic.in/";
+  if (t.includes('gpsc')) return "https://gpsc.gujarat.gov.in/";
+  if (t.includes('hpsc')) return "https://hpsc.gov.in/";
+  if (t.includes('hppsc')) return "https://hppsc.hp.gov.in/hppsc/";
+  if (t.includes('opsc')) return "https://www.opsc.gov.in/";
+  if (t.includes('tnpsc')) return "https://www.tnpsc.gov.in/";
+  if (t.includes('tspsc')) return "https://www.tspsc.gov.in/";
+  if (t.includes('appsc')) return "https://psc.ap.gov.in/";
+  if (t.includes('ossc')) return "https://www.ossc.gov.in/";
+  if (t.includes('hssc')) return "https://www.hssc.gov.in/";
+  if (t.includes('uksssc')) return "https://sssc.uk.gov.in/";
+  if (t.includes('bssc')) return "https://bssc.bihar.gov.in/";
+  if (t.includes('dsssb')) return "https://dsssb.delhi.gov.in/";
+  if (t.includes('psssb') || t.includes('punjab sssb')) return "https://sssb.punjab.gov.in/";
+  if (t.includes('jssc')) return "https://jssc.nic.in/";
+  if (t.includes('cgpsc')) return "https://psc.cg.gov.in/";
+  if (t.includes('mpesb') || t.includes('vyapam')) return "https://esb.mp.gov.in/";
 
   // --- FAIL SAFE: GOOGLE SEARCH ---
   return `https://www.google.com/search?q=${encodeURIComponent(title + " official website apply online")}`;
@@ -51,6 +80,18 @@ let cachedSections: SectionData[] | null = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
 
+const getWorkerBaseUrl = (): string => {
+  const configured = (import.meta.env.VITE_WORKER_URL || '').trim().replace(/\/$/, '');
+  if (configured) return configured;
+  try {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://127.0.0.1:8787';
+    }
+  } catch {}
+  return '';
+};
+
 export const jobService = {
   // Fetch all jobs from Backend API (With Caching)
   getAllJobs: async (forceRefresh = false): Promise<SectionData[]> => {
@@ -62,7 +103,7 @@ export const jobService = {
     }
 
     try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      const workerUrl = getWorkerBaseUrl();
       const apiUrl = workerUrl ? `${workerUrl}/api/jobs` : '/api/jobs';
 
       // Start with Mock Data (Hybrid Approach)
@@ -77,10 +118,13 @@ export const jobService = {
           const newUpdatesItems: JobLink[] = [];
 
           jobs.forEach(job => {
+            if (!isDisplayableJob(job)) {
+              return;
+            }
             // Create Link Item
             const linkItem: JobLink = {
               id: job.id,
-              title: job.title,
+              title: deriveReadableTitle(job),
               isNew: true, // New jobs from DB are always "New"
               link: job.importantLinks?.[0]?.url || getSmartLink(job.title),
               lastDate: job.importantDates?.[1]
@@ -135,14 +179,25 @@ export const jobService = {
     if (!query.trim()) return allSections;
 
     const lowerQuery = query.toLowerCase();
+    const tokens = lowerQuery
+      .replace(/[^\w\s/.-]/g, ' ')
+      .split(/\s+/)
+      .filter(t => t.length > 1 && !['declared'].includes(t));
 
-    return allSections.map(section => ({
-      ...section,
-      items: section.items.filter(item =>
-        item.title.toLowerCase().includes(lowerQuery) ||
-        section.title.toLowerCase().includes(lowerQuery)
-      )
-    })).filter(section => section.items.length > 0);
+    const filtered = allSections.map(section => {
+      const sectionTitle = section.title.toLowerCase();
+      const items = section.items.filter(item => {
+        const title = item.title.toLowerCase();
+        const direct = title.includes(lowerQuery) || sectionTitle.includes(lowerQuery);
+        if (direct) return true;
+        if (tokens.length === 0) return false;
+        const matchCount = tokens.reduce((acc, tok) => acc + (title.includes(tok) ? 1 : 0), 0);
+        return matchCount >= Math.min(2, tokens.length);
+      });
+      return { ...section, items };
+    }).filter(section => section.items.length > 0);
+
+    return filtered.length > 0 ? filtered : allSections;
   },
 
   // Get Detailed Job Info
@@ -155,14 +210,16 @@ export const jobService = {
     }
 
     try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      const workerUrl = getWorkerBaseUrl();
       const apiUrl = workerUrl ? `${workerUrl}/api/jobs/${id}` : `/api/jobs/${id}`;
 
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error('Job not found');
 
       const data = await response.json() as { success: boolean, job: JobDetailData };
-      return data.job;
+      const job = data.job;
+      const readable = deriveReadableTitle(job);
+      return { ...job, title: readable };
 
     } catch (error) {
       console.warn('Job API failed, falling back to mock or smart generation', error);
@@ -201,7 +258,7 @@ export const jobService = {
   // Subscribe User
   subscribeUser: async (userData: any): Promise<{ success: boolean; message: string; needsVerification?: boolean }> => {
     try {
-      const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+      const workerUrl = getWorkerBaseUrl();
       const apiUrl = workerUrl ? `${workerUrl}/api/subscribe` : '/api/subscribe';
 
       const response = await fetch(apiUrl, {
@@ -229,7 +286,7 @@ export const jobService = {
     jobData: any,
     adminPassword: string
   ): Promise<{ success: boolean; message: string; notificationsSent?: number }> => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const workerUrl = getWorkerBaseUrl();
     const response = await fetch(`${workerUrl}/api/admin/post-job`, {
       method: 'POST',
       headers: {
@@ -242,7 +299,7 @@ export const jobService = {
   },
 
   getSubscribersCount: async (adminPassword: string) => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const workerUrl = getWorkerBaseUrl();
     const response = await fetch(`${workerUrl}/api/admin/subscribers`, {
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });
@@ -251,7 +308,7 @@ export const jobService = {
   },
 
   getAllDbJobs: async (adminPassword: string) => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const workerUrl = getWorkerBaseUrl();
     const response = await fetch(`${workerUrl}/api/jobs`, {
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });
@@ -263,7 +320,7 @@ export const jobService = {
     jobData: any,
     adminPassword: string
   ): Promise<{ success: boolean; message: string }> => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const workerUrl = getWorkerBaseUrl();
     const response = await fetch(`${workerUrl}/api/admin/jobs`, {
       method: 'POST',
       headers: {
@@ -279,7 +336,7 @@ export const jobService = {
     jobId: string,
     adminPassword: string
   ): Promise<{ success: boolean; message: string }> => {
-    const workerUrl = import.meta.env.VITE_WORKER_URL || '';
+    const workerUrl = getWorkerBaseUrl();
     const response = await fetch(`${workerUrl}/api/admin/jobs/${jobId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${adminPassword}` },

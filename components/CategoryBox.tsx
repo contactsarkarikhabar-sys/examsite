@@ -53,8 +53,8 @@ const CategoryBox: React.FC<Props> = ({ data, onJobClick, onViewMore }) => {
   const hoverClass = linkHoverColor[data.color] || 'hover:text-gray-700';
 
   const handleClick = (e: React.MouseEvent, item: JobLink) => {
-      e.preventDefault();
       if (onJobClick) {
+          e.preventDefault();
           onJobClick(item.id, item.title);
       }
   };
@@ -81,7 +81,7 @@ const CategoryBox: React.FC<Props> = ({ data, onJobClick, onViewMore }) => {
         {displayItems.map((item) => (
           <li key={item.id} className="p-2 transition-colors hover:bg-gray-50">
             <a 
-                href={item.link} 
+                href={`/job/${encodeURIComponent(item.id)}`}
                 onClick={(e) => handleClick(e, item)}
                 className={`block text-xs md:text-sm font-medium text-gray-700 ${hoverClass} flex items-start group cursor-pointer`}
             >

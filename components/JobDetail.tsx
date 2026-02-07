@@ -58,15 +58,16 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
 
       <div className="container mx-auto px-4 py-8 -mt-6">
         
-        {/* Short Info Card */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8 transform transition-all hover:shadow-xl relative z-20">
-            <h2 className="text-lg font-bold text-red-800 mb-2 flex items-center">
-                <AlertCircle className="mr-2" /> {t.shortInfo}
-            </h2>
-            <p className="text-gray-600 text-sm md:text-base leading-relaxed text-justify">
-                {job.shortInfo}
-            </p>
-        </div>
+        {job.shortInfo && job.shortInfo.trim().length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8 transform transition-all hover:shadow-xl relative z-20">
+              <h2 className="text-lg font-bold text-red-800 mb-2 flex items-center">
+                  <AlertCircle className="mr-2" /> {t.shortInfo}
+              </h2>
+              <p className="text-gray-600 text-sm md:text-base leading-relaxed text-justify">
+                  {job.shortInfo}
+              </p>
+          </div>
+        )}
 
         {/* Video Section - Improved Logic */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden mb-8 hover:shadow-xl transition-shadow duration-300">
@@ -119,98 +120,102 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
         {/* Dynamic Grid for Important Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             
-            {/* Card 1: Important Dates */}
-            <div className="bg-white rounded-xl shadow-md p-0 overflow-hidden hover:scale-[1.02] transition-transform duration-300 border-t-4 border-green-600 group">
-                <div className="bg-green-50 p-4 border-b border-green-100 flex justify-between items-center group-hover:bg-green-100 transition-colors">
-                    <h3 className="font-bold text-green-800 flex items-center text-lg">
-                        <Calendar className="mr-2" size={20} /> {t.importantDates}
-                    </h3>
-                </div>
-                <div className="p-5">
-                    <ul className="space-y-3">
-                        {job.importantDates.map((date, idx) => (
-                            <li key={idx} className="flex items-start text-sm text-gray-700">
-                                <Clock size={16} className="mr-2 text-green-600 mt-0.5 flex-shrink-0" />
-                                <span className="font-medium">{date}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
+            {job.importantDates && job.importantDates.length > 0 && job.importantDates[0].trim().length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-0 overflow-hidden hover:scale-[1.02] transition-transform duration-300 border-t-4 border-green-600 group">
+                  <div className="bg-green-50 p-4 border-b border-green-100 flex justify-between items-center group-hover:bg-green-100 transition-colors">
+                      <h3 className="font-bold text-green-800 flex items-center text-lg">
+                          <Calendar className="mr-2" size={20} /> {t.importantDates}
+                      </h3>
+                  </div>
+                  <div className="p-5">
+                      <ul className="space-y-3">
+                          {job.importantDates.map((date, idx) => (
+                              <li key={idx} className="flex items-start text-sm text-gray-700">
+                                  <Clock size={16} className="mr-2 text-green-600 mt-0.5 flex-shrink-0" />
+                                  <span className="font-medium">{date}</span>
+                              </li>
+                          ))}
+                      </ul>
+                  </div>
+              </div>
+            )}
 
-            {/* Card 2: Application Fee */}
-            <div className="bg-white rounded-xl shadow-md p-0 overflow-hidden hover:scale-[1.02] transition-transform duration-300 border-t-4 border-blue-600 group">
-                <div className="bg-blue-50 p-4 border-b border-blue-100 flex justify-between items-center group-hover:bg-blue-100 transition-colors">
-                    <h3 className="font-bold text-blue-800 flex items-center text-lg">
-                        <CreditCard className="mr-2" size={20} /> {t.applicationFee}
-                    </h3>
-                </div>
-                <div className="p-5">
-                    <ul className="space-y-3">
-                        {job.applicationFee.map((fee, idx) => (
-                            <li key={idx} className="flex items-start text-sm text-gray-700">
-                                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2.5 mt-1.5 flex-shrink-0"></span>
-                                <span className="font-medium">{fee}</span>
-                            </li>
-                        ))}
-                    </ul>
-                    <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500 italic">
-                        {t.paymentMode}
-                    </div>
-                </div>
-            </div>
+            {job.applicationFee && job.applicationFee.length > 0 && job.applicationFee[0].trim().length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-0 overflow-hidden hover:scale-[1.02] transition-transform duration-300 border-t-4 border-blue-600 group">
+                  <div className="bg-blue-50 p-4 border-b border-blue-100 flex justify-between items-center group-hover:bg-blue-100 transition-colors">
+                      <h3 className="font-bold text-blue-800 flex items-center text-lg">
+                          <CreditCard className="mr-2" size={20} /> {t.applicationFee}
+                      </h3>
+                  </div>
+                  <div className="p-5">
+                      <ul className="space-y-3">
+                          {job.applicationFee.map((fee, idx) => (
+                              <li key={idx} className="flex items-start text-sm text-gray-700">
+                                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2.5 mt-1.5 flex-shrink-0"></span>
+                                  <span className="font-medium">{fee}</span>
+                              </li>
+                          ))}
+                      </ul>
+                      <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500 italic">
+                          {t.paymentMode}
+                      </div>
+                  </div>
+              </div>
+            )}
 
-            {/* Card 3: Age Limit */}
-            <div className="bg-white rounded-xl shadow-md p-0 overflow-hidden hover:scale-[1.02] transition-transform duration-300 border-t-4 border-purple-600 group md:col-span-2 lg:col-span-1">
-                <div className="bg-purple-50 p-4 border-b border-purple-100 flex justify-between items-center group-hover:bg-purple-100 transition-colors">
-                    <h3 className="font-bold text-purple-800 flex items-center text-lg">
-                        <User className="mr-2" size={20} /> {t.ageLimit}
-                    </h3>
-                </div>
-                <div className="p-5">
-                    <ul className="space-y-3">
-                        {job.ageLimit.map((age, idx) => (
-                            <li key={idx} className="flex items-start text-sm text-gray-700">
-                                <CheckCircle size={16} className="mr-2 text-purple-600 mt-0.5 flex-shrink-0" />
-                                <span className="font-medium">{age}</span>
-                            </li>
-                        ))}
-                    </ul>
-                    <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
-                        {t.ageRelaxation}
-                    </div>
-                </div>
-            </div>
+            {job.ageLimit && job.ageLimit.length > 0 && job.ageLimit[0].trim().length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-0 overflow-hidden hover:scale-[1.02] transition-transform duration-300 border-t-4 border-purple-600 group md:col-span-2 lg:col-span-1">
+                  <div className="bg-purple-50 p-4 border-b border-purple-100 flex justify-between items-center group-hover:bg-purple-100 transition-colors">
+                      <h3 className="font-bold text-purple-800 flex items-center text-lg">
+                          <User className="mr-2" size={20} /> {t.ageLimit}
+                      </h3>
+                  </div>
+                  <div className="p-5">
+                      <ul className="space-y-3">
+                          {job.ageLimit.map((age, idx) => (
+                              <li key={idx} className="flex items-start text-sm text-gray-700">
+                                  <CheckCircle size={16} className="mr-2 text-purple-600 mt-0.5 flex-shrink-0" />
+                                  <span className="font-medium">{age}</span>
+                              </li>
+                          ))}
+                      </ul>
+                      <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                          {t.ageRelaxation}
+                      </div>
+                  </div>
+              </div>
+            )}
         </div>
 
-        {/* Vacancy Details Table */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden mb-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4 flex items-center justify-between">
-                <h3 className="text-xl font-bold flex items-center">
-                    <GraduationCap className="text-yellow-400 mr-2" /> {t.vacancyDetails}
-                </h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider text-xs">
-                        <tr>
-                            <th className="px-6 py-4 font-bold border-b">{t.postName}</th>
-                            <th className="px-6 py-4 font-bold border-b">{t.totalPost}</th>
-                            <th className="px-6 py-4 font-bold border-b">{t.eligibilityCriteria}</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {job.vacancyDetails.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-red-50/50 transition-colors">
-                                <td className="px-6 py-4 font-bold text-red-700 whitespace-nowrap">{row.postName}</td>
-                                <td className="px-6 py-4 font-bold text-gray-800">{row.totalPost}</td>
-                                <td className="px-6 py-4 text-gray-600 leading-relaxed min-w-[300px]">{row.eligibility}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        {job.vacancyDetails && job.vacancyDetails.length > 0 && job.vacancyDetails[0].postName.trim().length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden mb-8 hover:shadow-xl transition-shadow duration-300">
+              <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4 flex items-center justify-between">
+                  <h3 className="text-xl font-bold flex items-center">
+                      <GraduationCap className="text-yellow-400 mr-2" /> {t.vacancyDetails}
+                  </h3>
+              </div>
+              <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider text-xs">
+                          <tr>
+                              <th className="px-6 py-4 font-bold border-b">{t.postName}</th>
+                              <th className="px-6 py-4 font-bold border-b">{t.totalPost}</th>
+                              <th className="px-6 py-4 font-bold border-b">{t.eligibilityCriteria}</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                          {job.vacancyDetails.map((row, idx) => (
+                              <tr key={idx} className="hover:bg-red-50/50 transition-colors">
+                                  <td className="px-6 py-4 font-bold text-red-700 whitespace-nowrap">{row.postName}</td>
+                                  <td className="px-6 py-4 font-bold text-gray-800">{row.totalPost}</td>
+                                  <td className="px-6 py-4 text-gray-600 leading-relaxed min-w-[300px]">{row.eligibility}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+        )}
 
         {/* How to Fill Form (Static Text for SEO/Help) */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-8 hover:shadow-lg transition-all">
@@ -222,37 +227,38 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
             </ul>
         </div>
 
-        {/* Important Links Section */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="bg-red-50 p-4 border-b border-red-100">
-                <h3 className="text-xl font-bold text-red-800 flex items-center">
-                    <ExternalLink className="mr-2" /> {t.importantLinks}
-                </h3>
-            </div>
-            <div className="divide-y divide-gray-100">
-                {job.importantLinks.map((link, idx) => (
-                    <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-gray-50 transition-colors group">
-                        <div className="flex items-center mb-3 md:mb-0">
-                             <div className="w-2 h-2 bg-red-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></div>
-                             <span className="font-bold text-gray-700 group-hover:text-red-700 transition-colors">
-                                {link.label}
-                             </span>
-                        </div>
-                        <a 
-                            href={link.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all w-full md:w-auto"
-                        >
-                            {link.label.toLowerCase().includes("download") ? <Download size={16} className="mr-2" /> : 
-                             link.label.toLowerCase().includes("official") ? <Globe size={16} className="mr-2" /> : 
-                             <ExternalLink size={16} className="mr-2" />}
-                            {t.clickHere}
-                        </a>
-                    </div>
-                ))}
-            </div>
-        </div>
+        {job.importantLinks && job.importantLinks.length > 0 && job.importantLinks[0].url.trim().length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="bg-red-50 p-4 border-b border-red-100">
+                  <h3 className="text-xl font-bold text-red-800 flex items-center">
+                      <ExternalLink className="mr-2" /> {t.importantLinks}
+                  </h3>
+              </div>
+              <div className="divide-y divide-gray-100">
+                  {job.importantLinks.map((link, idx) => (
+                      <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between p-4 hover:bg-gray-50 transition-colors group">
+                          <div className="flex items-center mb-3 md:mb-0">
+                               <div className="w-2 h-2 bg-red-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></div>
+                               <span className="font-bold text-gray-700 group-hover:text-red-700 transition-colors">
+                                  {link.label}
+                               </span>
+                          </div>
+                          <a 
+                              href={link.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all w-full md:w-auto"
+                          >
+                              {link.label.toLowerCase().includes("download") ? <Download size={16} className="mr-2" /> : 
+                               link.label.toLowerCase().includes("official") ? <Globe size={16} className="mr-2" /> : 
+                               <ExternalLink size={16} className="mr-2" />}
+                              {t.clickHere}
+                          </a>
+                      </div>
+                  ))}
+              </div>
+          </div>
+        )}
 
       </div>
 

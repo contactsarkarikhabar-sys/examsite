@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { deriveReadableTitle, isActionOnlyTitle, isGenericHeadTitle, isTrustedDomain as isTrustedDomainShared, stripGenericHeadPrefix } from '../shared/jobTitle';
 
 interface Env {
     DB: D1Database;
@@ -29,15 +30,36 @@ interface ParsedJob {
 export class AutoAgent {
     private env: Env;
 
-    // Priority domains for authentic info
-    private readonly TRUSTED_SITES = [
-        'ssc.gov.in', 'upsc.gov.in', 'indianrailways.gov.in', 'ibps.in',
-        'rbi.org.in', 'drdo.gov.in', 'isro.gov.in', 'joinindianarmy.nic.in',
-        'joinindiannavy.gov.in', 'agnipathvayu.cdac.in'
-    ];
-
     constructor(env: Env) {
         this.env = env;
+    }
+
+    private isClaritySufficient(job: ParsedJob): boolean {
+        const title = (job.title || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+        const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
+        const titleLen = title.length;
+        const infoLen = info.length;
+        const rawTitle = String(job.title || '');
+        const genericHead = isGenericHeadTitle(rawTitle);
+        const strippedTitle = stripGenericHeadPrefix(rawTitle);
+        const genericHeadBad = genericHead && strippedTitle.length < 12;
+        const looksLikeUrl = /^https?:\/\//i.test(rawTitle) || /https?:\/\//i.test(info);
+        const hasQueryNoise = /(\bkey=|utm_|ref=)/i.test(rawTitle) || /(\bkey=|utm_|ref=)/i.test(info);
+        const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'nhm', 'police', 'constable', 'group d', 'bank', 'ibps', 'sbi', 'rbi', 'teacher', 'engineer', 'clerk', 'apprentice',
+            'uppsc','upsssc','rpsc','rsmssb','mppsc','bpsc','wbpsc','jkpsc','jpsc','mpsc','kpsc','gpsc','hpsc','hppsc','opsc','tnpsc','tspsc','appsc','ossc','hssc','uksssc','bssc','dsssb','psssb','jssc','cgpsc','mpesb'
+        ];
+        const hasKeyword = keywords.some(k => title.includes(k) || info.includes(k));
+        const domainOk = isTrustedDomainShared(job.applyLink);
+        const hasLink = !!(job.applyLink && job.applyLink.trim().length > 0);
+        const actionOnly = isActionOnlyTitle(rawTitle);
+        return (
+            !genericHeadBad &&
+            !looksLikeUrl &&
+            !hasQueryNoise &&
+            !actionOnly &&
+            (titleLen >= 20 || infoLen >= 40 || hasKeyword || domainOk) &&
+            hasLink
+        );
     }
 
     async run(): Promise<{ success: boolean; message: string; jobsAdded: number; debug?: any }> {
@@ -45,8 +67,7 @@ export class AutoAgent {
             console.log('Starting AutoAgent run...');
             const currentYear = new Date().getFullYear();
 
-            // Strategy: Specific query for official government notifications
-            const query = `site:gov.in recruitment notification 2026`;
+            const query = `(site:gov.in OR site:nic.in) recruitment notification ${currentYear}`;
 
             const { results, debug } = await this.searchSerpApi(query);
 
@@ -72,9 +93,13 @@ export class AutoAgent {
                 try {
                     const job = await this.analyzeWithGemini(result);
                     if (job) {
-                        console.log(`Saving job: ${job.title}`);
-                        await this.saveJobToDb(job);
-                        jobsAdded++;
+                        if (this.isClaritySufficient(job)) {
+                            console.log(`Saving job: ${job.title}`);
+                            await this.saveJobToDb(job);
+                            jobsAdded++;
+                        } else {
+                            skippedReasons.push(`Unclear: ${job.title.substring(0, 40)}... from ${result.link}`);
+                        }
                     } else {
                         skippedReasons.push(`Skipped: ${result.title.substring(0, 30)}... (Returned null)`);
                     }
@@ -121,7 +146,7 @@ export class AutoAgent {
 
         // SerpAPI Endpoint
         // Engine: google, google_domain: google.co.in, gl: in (India)
-        const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${this.env.SERP_API_KEY}&num=5&google_domain=google.co.in&gl=in`;
+        const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${this.env.SERP_API_KEY}&num=10&google_domain=google.co.in&gl=in&tbs=qdr:w`;
         debug.url = url.replace(this.env.SERP_API_KEY, 'HIDDEN_KEY');
 
         console.log('Fetching SerpAPI...');
@@ -150,14 +175,17 @@ export class AutoAgent {
     }
 
     private async filterExistingJobs(results: SearchResult[]): Promise<SearchResult[]> {
-        const uniqueResults = [];
+        const uniqueResults: SearchResult[] = [];
         for (const result of results) {
-            // Check if link exists in DB
-            const existing = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
+            const byLink = await this.env.DB.prepare('SELECT id FROM job_details WHERE apply_link = ?')
                 .bind(result.link)
                 .first();
-
-            if (!existing) {
+            const byTitle = await this.env.DB.prepare('SELECT id FROM job_details WHERE title = ?')
+                .bind(result.title)
+                .first();
+            const exists = byLink || byTitle;
+            console.log(`Dedup check: title="${result.title}" link="${result.link}" exists=${!!exists}`);
+            if (!exists) {
                 uniqueResults.push(result);
             }
         }
@@ -254,16 +282,33 @@ export class AutoAgent {
             const parsed = JSON.parse(cleanText);
 
             // Normalize fields to ensure strings for DB
+            const sanitizeUrl = (u: string) => (u || '').replace(/`/g, '').trim();
+            const links = Array.isArray(parsed.importantLinks)
+                ? parsed.importantLinks.map((l: any) => ({
+                    label: String(l.label || 'Link'),
+                    url: sanitizeUrl(String(l.url || result.link))
+                }))
+                : [{ label: "Apply Link", url: sanitizeUrl(result.link) }];
+            const importantDatesArr = Array.isArray(parsed.importantDates)
+                ? parsed.importantDates.map((d: any) => String(d))
+                : ["Check Notification"];
+            const derivedTitle = deriveReadableTitle({
+                title: String(parsed.title || result.title || ''),
+                shortInfo: String(parsed.shortInfo || result.snippet || ''),
+                importantDates: importantDatesArr,
+                importantLinks: links,
+                applyLink: sanitizeUrl(result.link)
+            });
             return {
-                title: parsed.title || result.title,
+                title: derivedTitle,
                 category: parsed.category || 'Other',
                 shortInfo: parsed.shortInfo || result.snippet,
-                importantDates: JSON.stringify(parsed.importantDates || ["Check Notification"]),
+                importantDates: JSON.stringify(importantDatesArr),
                 applicationFee: JSON.stringify(parsed.applicationFee || ["See Notification"]),
                 ageLimit: JSON.stringify(parsed.ageLimit || ["See Notification"]),
                 vacancyDetails: JSON.stringify(parsed.vacancyDetails || []),
-                importantLinks: JSON.stringify(parsed.importantLinks || [{ label: "Apply Link", url: result.link }]),
-                applyLink: result.link
+                importantLinks: JSON.stringify(links),
+                applyLink: sanitizeUrl(result.link)
             };
 
         } catch (e) {
@@ -287,15 +332,45 @@ export class AutoAgent {
                 ? feesFound.map(f => `Fee: ${f}`)
                 : ["See Notification"];
 
+            const ageMinMatch = snippet.match(/(?:Min(?:imum)?\s*Age)\s*[:\-]?\s*(\d{1,2})/i);
+            const ageMaxMatch = snippet.match(/(?:Max(?:imum)?\s*Age)\s*[:\-]?\s*(\d{1,2})/i);
+            const ageLimitArr: string[] = [];
+            if (ageMinMatch) ageLimitArr.push(`Minimum Age: ${ageMinMatch[1]} Years`);
+            if (ageMaxMatch) ageLimitArr.push(`Maximum Age: ${ageMaxMatch[1]} Years`);
+            if (ageLimitArr.length === 0) ageLimitArr.push("As per rules");
+
+            const postName =
+                (snippet.match(/(?:post(?:s)?\s+of|recruitment\s+for|engagement\s+of|for\s+the\s+post\s+of)\s+([A-Za-z][A-Za-z\s\-\/&]+)/i)?.[1] || '')
+                    .trim() ||
+                (snippet.match(/\b(Jeep Driver|Driver|Clerk|Officer|Assistant|Engineer|Teacher|Nurse|Police|Constable|Inspector|Stenographer|Typist|Analyst|Apprentice|Junior|Senior)\b/i)?.[0] || 'Various Posts');
+            const totalPost =
+                (snippet.match(/total\s*posts?\s*[:\-]?\s*(\d{1,4})/i)?.[1] ||
+                 snippet.match(/\b(\d{1,4})\s+posts?\b/i)?.[1] || 'N/A');
+            const eligibilityKeywords = [
+                '10th', '12th', 'Matric', 'Intermediate', 'Graduate', 'Bachelor', 'Diploma', 'ITI',
+                'BTech', 'MTech', 'B.Sc', 'M.Sc', 'MBA', 'CA', 'LLB', 'BE', 'ME'
+            ];
+            const foundEligibility = eligibilityKeywords.filter(k => new RegExp(k.replace('.', '\\.'), 'i').test(snippet));
+            const eligibility = foundEligibility.length > 0 ? foundEligibility.join(' / ') : 'See Details';
+            const vacancyDetails = [{ postName, totalPost, eligibility }];
+
+            const fallbackLinks = [{ label: "Source Link", url: result.link }];
+            const fallbackTitle = deriveReadableTitle({
+                title: String(result.title || ''),
+                shortInfo: String(snippet || ''),
+                importantDates,
+                importantLinks: fallbackLinks,
+                applyLink: String(result.link || '')
+            });
             return {
-                title: result.title,
+                title: fallbackTitle,
                 category: 'Other',
                 shortInfo: snippet.length > 50 ? snippet : `${result.title} - Click to read more.`,
                 importantDates: JSON.stringify(importantDates),
                 applicationFee: JSON.stringify(applicationFee),
-                ageLimit: JSON.stringify(["As per rules"]),
-                vacancyDetails: JSON.stringify([{ postName: "Various Posts", totalPost: "N/A", eligibility: "See Details" }]),
-                importantLinks: JSON.stringify([{ label: "Source Link", url: result.link }]),
+                ageLimit: JSON.stringify(ageLimitArr),
+                vacancyDetails: JSON.stringify(vacancyDetails),
+                importantLinks: JSON.stringify(fallbackLinks),
                 applyLink: result.link
             };
         }
@@ -329,18 +404,18 @@ export class AutoAgent {
     }
 
     private async saveJobToDb(job: ParsedJob) {
-        // 1. Insert into job_posts
-        // Convert JSON string back to array-string for job_posts table (legacy compatibility if needed)
-        // Or just use the string directly if schema supports text.
-        // Assuming job_posts.important_dates is TEXT.
         const dateStr = job.importantDates;
 
-        await this.env.DB.prepare(`
-            INSERT INTO job_posts (title, category, short_info, important_dates, apply_link)
-            VALUES (?, ?, ?, ?, ?)
-        `).bind(job.title, job.category, job.shortInfo, dateStr, job.applyLink).run();
+        const existingPost = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
+            .bind(job.applyLink)
+            .first();
+        if (!existingPost) {
+            await this.env.DB.prepare(`
+                INSERT INTO job_posts (title, category, short_info, important_dates, apply_link)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(job.title, job.category, job.shortInfo, dateStr, job.applyLink).run();
+        }
 
-        // 2. Insert into job_details
         const id = job.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now().toString().slice(-4);
 
         await this.env.DB.prepare(`

@@ -5,6 +5,7 @@
 
 import { EmailService } from './email-service';
 import { emailTemplates } from './email-templates';
+import { deriveReadableTitle } from '../shared/jobTitle';
 
 // Types
 interface Env {
@@ -463,15 +464,37 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
         const jobs = await env.DB.prepare('SELECT * FROM job_details WHERE is_active = 1 ORDER BY updated_at DESC')
             .all();
 
-        // Parse JSON fields
-        const parsedJobs = jobs.results?.map((job: any) => ({
-            ...job,
-            importantDates: JSON.parse(job.important_dates || '[]'),
-            applicationFee: JSON.parse(job.application_fee || '[]'),
-            ageLimit: JSON.parse(job.age_limit || '[]'),
-            vacancyDetails: JSON.parse(job.vacancy_details || '[]'),
-            importantLinks: JSON.parse(job.important_links || '[]'),
-        })) || [];
+        const parsedJobs = (jobs.results || []).map((row: any) => {
+            const importantDates = JSON.parse(row.important_dates || '[]');
+            const applicationFee = JSON.parse(row.application_fee || '[]');
+            const ageLimit = JSON.parse(row.age_limit || '[]');
+            const vacancyDetails = JSON.parse(row.vacancy_details || '[]');
+            const importantLinks = (JSON.parse(row.important_links || '[]') as any[]).map((l: any) => ({
+                label: String(l?.label || ''),
+                url: String(l?.url || '').replace(/`/g, '').trim()
+            }));
+            const applyLink = String(row.apply_link || '');
+            const title = deriveReadableTitle({
+                title: String(row.title || ''),
+                shortInfo: String(row.short_info || ''),
+                importantDates,
+                importantLinks,
+                applyLink
+            });
+            return {
+                id: String(row.id || ''),
+                title,
+                category: String(row.category || ''),
+                postDate: String(row.post_date || ''),
+                shortInfo: String(row.short_info || ''),
+                importantDates,
+                applicationFee,
+                ageLimit,
+                vacancyDetails,
+                importantLinks,
+                applyLink
+            };
+        });
 
         return jsonResponse({ success: true, jobs: parsedJobs, count: parsedJobs.length }, 200, origin);
     } catch (error) {
@@ -492,13 +515,34 @@ async function handleGetJob(request: Request, env: Env, jobId: string): Promise<
             return errorResponse('Job not found', 404, origin);
         }
 
+        const importantDates = JSON.parse((job as any).important_dates || '[]');
+        const applicationFee = JSON.parse((job as any).application_fee || '[]');
+        const ageLimit = JSON.parse((job as any).age_limit || '[]');
+        const vacancyDetails = JSON.parse((job as any).vacancy_details || '[]');
+        const importantLinks = (JSON.parse((job as any).important_links || '[]') as any[]).map((l: any) => ({
+            label: String(l?.label || ''),
+            url: String(l?.url || '').replace(/`/g, '').trim()
+        }));
+        const applyLink = String((job as any).apply_link || '');
+        const title = deriveReadableTitle({
+            title: String((job as any).title || ''),
+            shortInfo: String((job as any).short_info || ''),
+            importantDates,
+            importantLinks,
+            applyLink
+        });
         const parsedJob = {
-            ...job,
-            importantDates: JSON.parse((job as any).important_dates || '[]'),
-            applicationFee: JSON.parse((job as any).application_fee || '[]'),
-            ageLimit: JSON.parse((job as any).age_limit || '[]'),
-            vacancyDetails: JSON.parse((job as any).vacancy_details || '[]'),
-            importantLinks: JSON.parse((job as any).important_links || '[]'),
+            id: String((job as any).id || ''),
+            title,
+            category: String((job as any).category || ''),
+            postDate: String((job as any).post_date || ''),
+            shortInfo: String((job as any).short_info || ''),
+            importantDates,
+            applicationFee,
+            ageLimit,
+            vacancyDetails,
+            importantLinks,
+            applyLink
         };
 
         return jsonResponse({ success: true, job: parsedJob }, 200, origin);
@@ -625,7 +669,10 @@ export default {
 
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
-        const path = url.pathname;
+        let path = url.pathname;
+        if (path.length > 1 && path.endsWith('/')) {
+            path = path.replace(/\/+$/, '');
+        }
         const origin = request.headers.get('Origin');
 
         // Handle CORS preflight
@@ -655,6 +702,126 @@ export default {
 
         if (path === '/api/admin/subscribers' && request.method === 'GET') {
             return handleGetSubscribers(request, env);
+        }
+
+        if (path === '/api/admin/ping' && request.method === 'GET') {
+            const queryKey = url.searchParams.get('key');
+            const authHeader = request.headers.get('Authorization');
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized. Use header or ?key', 401, origin);
+            }
+            return jsonResponse({ success: true, message: 'Authorized' }, 200, origin);
+        }
+
+        if (path === '/api/admin/quick-add' && (request.method === 'GET' || request.method === 'POST')) {
+            const queryKey = url.searchParams.get('key');
+            const authHeader = request.headers.get('Authorization');
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized. Use ?key=YOUR_ADMIN_PASSWORD', 401, origin);
+            }
+            try {
+                const id = sanitizeString(url.searchParams.get('id') || '', 100);
+                const title = sanitizeString(url.searchParams.get('title') || '', 200);
+                const category = sanitizeString(url.searchParams.get('category') || 'Latest Jobs', 50);
+                const postDate = sanitizeString(url.searchParams.get('postDate') || '', 100);
+                const shortInfo = sanitizeString(url.searchParams.get('shortInfo') || '', 5000);
+                if (!id || !title) {
+                    return errorResponse('ID and Title are required', 400, origin);
+                }
+                const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
+                    .bind(id)
+                    .first();
+                if (existing) {
+                    await env.DB.prepare(`
+                        UPDATE job_details SET
+                            title = ?, category = ?, post_date = ?, short_info = ?, updated_at = datetime('now')
+                        WHERE id = ?
+                    `)
+                        .bind(title, category, postDate, shortInfo, id)
+                        .run();
+                    return jsonResponse({ success: true, message: 'Job updated', id }, 200, origin);
+                } else {
+                    await env.DB.prepare(`
+                        INSERT INTO job_details (id, title, category, post_date, short_info, important_dates, application_fee, age_limit, vacancy_details, important_links, apply_link, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, '[]', '[]', '[]', '[]', '[]', '', 1, datetime('now'), datetime('now'))
+                    `)
+                        .bind(id, title, category, postDate, shortInfo)
+                        .run();
+                    return jsonResponse({ success: true, message: 'Job created', id }, 200, origin);
+                }
+            } catch (error) {
+                console.error('Quick add error:', error);
+                return errorResponse('Server error', 500, origin);
+            }
+        }
+
+        if (path === '/api/admin/jobs/quick-add' && (request.method === 'GET' || request.method === 'POST')) {
+            const queryKey = url.searchParams.get('key');
+            const authHeader = request.headers.get('Authorization');
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized. Use ?key=YOUR_ADMIN_PASSWORD', 401, origin);
+            }
+            try {
+                const id = sanitizeString(url.searchParams.get('id') || '', 100);
+                const title = sanitizeString(url.searchParams.get('title') || '', 200);
+                const category = sanitizeString(url.searchParams.get('category') || 'Latest Jobs', 50);
+                const postDate = sanitizeString(url.searchParams.get('postDate') || '', 100);
+                const shortInfo = sanitizeString(url.searchParams.get('shortInfo') || '', 5000);
+                if (!id || !title) {
+                    return errorResponse('ID and Title are required', 400, origin);
+                }
+                const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
+                    .bind(id)
+                    .first();
+                if (existing) {
+                    await env.DB.prepare(`
+                        UPDATE job_details SET
+                            title = ?, category = ?, post_date = ?, short_info = ?, updated_at = datetime('now')
+                        WHERE id = ?
+                    `)
+                        .bind(title, category, postDate, shortInfo, id)
+                        .run();
+                    return jsonResponse({ success: true, message: 'Job updated', id }, 200, origin);
+                } else {
+                    await env.DB.prepare(`
+                        INSERT INTO job_details (id, title, category, post_date, short_info, important_dates, application_fee, age_limit, vacancy_details, important_links, apply_link, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, '[]', '[]', '[]', '[]', '[]', '', 1, datetime('now'), datetime('now'))
+                    `)
+                        .bind(id, title, category, postDate, shortInfo)
+                        .run();
+                    return jsonResponse({ success: true, message: 'Job created', id }, 200, origin);
+                }
+            } catch (error) {
+                console.error('Quick add error:', error);
+                return errorResponse('Server error', 500, origin);
+            }
         }
 
         // Manual Agent Trigger (Admin Only) - Enhanced for Browser usage
@@ -691,6 +858,37 @@ export default {
                     message: `Agent Error: ${error instanceof Error ? error.message : String(error)}`,
                     jobsAdded: 0
                 }, 500, origin);
+            }
+        }
+
+        if (path === '/api/admin/migrate' && (request.method === 'POST' || request.method === 'GET')) {
+            const url = new URL(request.url);
+            const queryKey = url.searchParams.get('key');
+            const authHeader = request.headers.get('Authorization');
+            if (!env.ADMIN_PASSWORD) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            let isAuthorized = false;
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+                isAuthorized = true;
+            }
+            if (!isAuthorized) {
+                return errorResponse('Unauthorized. Use ?key=YOUR_ADMIN_PASSWORD', 401, origin);
+            }
+            try {
+                const info = await env.DB.prepare('PRAGMA table_info(job_details)').all();
+                const hasApplyLink = (info.results || []).some((r: any) => r.name === 'apply_link');
+                let applied = false;
+                if (!hasApplyLink) {
+                    await env.DB.prepare('ALTER TABLE job_details ADD COLUMN apply_link TEXT').run();
+                    applied = true;
+                }
+                return jsonResponse({ success: true, applied }, 200, origin);
+            } catch (error) {
+                console.error('Migration error:', error);
+                return errorResponse('Migration failed', 500, origin);
             }
         }
 

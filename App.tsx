@@ -23,7 +23,8 @@ const HomePage: React.FC<{
     onViewMore: (categoryTitle: string) => void;
     onAlertModalOpen: () => void;
     onInstallApp: () => void;
-}> = ({ searchQuery, onJobClick, onViewMore, onAlertModalOpen, onInstallApp }) => {
+    onClearSearch: () => void;
+}> = ({ searchQuery, onJobClick, onViewMore, onAlertModalOpen, onInstallApp, onClearSearch }) => {
     const [sections, setSections] = useState<SectionData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { language } = useLanguage();
@@ -137,7 +138,19 @@ const HomePage: React.FC<{
             {!isLoading && sections.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                     <Frown size={64} className="mb-4 text-gray-300" />
-                    <h3 className="text-xl font-bold text-gray-700">{t.noJobsFound}</h3>
+                    <h3 className="text-xl font-bold text-gray-700">
+                        {searchQuery?.trim()
+                            ? `${t.noMatching} "${searchQuery}"`
+                            : t.noJobsFound}
+                    </h3>
+                    {searchQuery?.trim() && (
+                        <button
+                            onClick={onClearSearch}
+                            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow hover:bg-red-700 transition"
+                        >
+                            {t.clearSearch}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -154,6 +167,7 @@ const HomePage: React.FC<{
 const JobDetailPage: React.FC = () => {
     const { jobId } = useParams<{ jobId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [job, setJob] = useState<JobDetailData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -161,13 +175,14 @@ const JobDetailPage: React.FC = () => {
         const fetchJob = async () => {
             if (jobId) {
                 setIsLoading(true);
-                const detail = await jobService.getJobDetail(jobId, decodeURIComponent(jobId));
+                const state = location.state as { title?: string } | null;
+                const detail = await jobService.getJobDetail(jobId, state?.title);
                 setJob(detail);
                 setIsLoading(false);
             }
         };
         fetchJob();
-    }, [jobId]);
+    }, [jobId, location.state]);
 
     if (isLoading) {
         return (
@@ -204,7 +219,7 @@ const CategoryPage: React.FC = () => {
     }, [categoryName]);
 
     const handleJobClick = (id: string, title: string) => {
-        navigate(`/job/${encodeURIComponent(id)}`);
+        navigate(`/job/${encodeURIComponent(id)}`, { state: { title } });
     };
 
     if (isLoading) {
@@ -261,7 +276,7 @@ const App: React.FC = () => {
     };
 
     const handleJobClick = (id: string, title: string) => {
-        navigate(`/job/${encodeURIComponent(id)}`);
+        navigate(`/job/${encodeURIComponent(id)}`, { state: { title } });
     };
 
     const handleViewMore = (categoryTitle: string) => {
@@ -313,7 +328,7 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-gray-100 font-sans">
             <Header onSearch={handleSearch} onNavigate={handleNavigate} onCategoryClick={handleViewMore} />
-            <Marquee />
+            <Marquee onItemClick={handleSearch} />
 
             <main className="container mx-auto px-4 py-6 flex-grow">
                 <Routes>
@@ -327,6 +342,7 @@ const App: React.FC = () => {
                                 onViewMore={handleViewMore}
                                 onAlertModalOpen={() => setIsAlertModalOpen(true)}
                                 onInstallApp={handleInstallApp}
+                                onClearSearch={() => setSearchQuery('')}
                             />
                         }
                     />
@@ -354,6 +370,7 @@ const App: React.FC = () => {
                                 onViewMore={handleViewMore}
                                 onAlertModalOpen={() => setIsAlertModalOpen(true)}
                                 onInstallApp={handleInstallApp}
+                                onClearSearch={() => setSearchQuery('')}
                             />
                         }
                     />

@@ -235,7 +235,7 @@ export const translations = {
     status: "स्थिति",
     lastDate: "अंतिम तिथि",
     clearSearch: "खोज साफ़ करें",
-    noMatching: "कोई नौकरी नहीं मिली: "
+    noMatching: "कोई नौकरी नहीं मिली:"
   }
 };
 
