@@ -46,7 +46,7 @@ export class AutoAgent {
             const currentYear = new Date().getFullYear();
 
             // Strategy: Specific query for official government notifications
-            const query = `site:gov.in recruitment notification 2026`;
+            const query = `site:gov.in recruitment notification ${currentYear}`;
 
             const { results, debug } = await this.searchSerpApi(query);
 
