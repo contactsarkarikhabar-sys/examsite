@@ -162,6 +162,22 @@ export const MOCK_SECTIONS: SectionData[] = [
 
 export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
   // --- RESULTS ---
+  "ugc-net-dec-res": {
+    id: "ugc-net-dec-res",
+    title: "NTA UGC NET December 2025 Final Answer Key / Result",
+    postDate: "Updated: Today",
+    shortInfo: "National Testing Agency (NTA) has released the final answer key and result for the UGC NET December 2025 cycle. Candidates can check their scores and cut-off marks subject-wise.",
+    importantDates: ["Exam Date: Dec 2025", "Result Declared: Today"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+      { postName: "JRF & Assistant Professor", totalPost: "Various", eligibility: "Master Degree in Related Subject" }
+    ],
+    importantLinks: [
+      { label: "Download Result", url: "https://ugcnet.nta.nic.in/" },
+      { label: "Official Website", url: "https://ugcnet.nta.nic.in/" }
+    ]
+  },
   "ssc-phase-13-res": {
     id: "ssc-phase-13-res",
     title: "SSC Selection Post Phase 13 Result 2025",
@@ -198,7 +214,436 @@ export const JOB_DETAILS_DB: Record<string, JobDetailData> = {
         { label: "Official Website", url: "https://uppsc.up.nic.in/" }
     ]
   },
+  "ugc-net-res": {
+    id: "ugc-net-res",
+    title: "NTA UGC NET December 2025 Final Answer Key / Result",
+    postDate: "Updated: Today",
+    shortInfo: "National Testing Agency (NTA) has released the final answer key and result for the UGC NET December 2025 cycle. Candidates can check their scores and cut-off marks subject-wise.",
+    importantDates: ["Exam Date: Dec 2025", "Result Declared: Today"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+      { postName: "JRF & Assistant Professor", totalPost: "Various", eligibility: "Master Degree in Related Subject" }
+    ],
+    importantLinks: [
+      { label: "Download Result", url: "https://ugcnet.nta.nic.in/" },
+      { label: "Official Website", url: "https://ugcnet.nta.nic.in/" }
+    ]
+  },
+  "lic-aao-res": {
+    id: "lic-aao-res",
+    title: "LIC AAO (Generalist) Mains Result 2026",
+    postDate: "Updated: Today",
+    shortInfo: "Life Insurance Corporation of India (LIC) has announced the Mains Result for the recruitment of Assistant Administrative Officers (AAO) Generalist 31st Batch. Candidates can check their roll numbers in the merit list.",
+    importantDates: ["Mains Exam: Jan 2026", "Result: Declared"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "AAO Generalist", totalPost: "300", eligibility: "Mains Qualified" }
+    ],
+    importantLinks: [
+        { label: "Download Result", url: "https://licindia.in/" }
+    ]
+  },
+  "ecgc-po-res": {
+    id: "ecgc-po-res",
+    title: "ECGC Probationary Officer PO Result 2026",
+    postDate: "New",
+    shortInfo: "ECGC Ltd has released the written exam result for Probationary Officer (PO) Recruitment 2026. Selected candidates will be called for an interview.",
+    importantDates: ["Exam Date: Jan 2026", "Result: Declared"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "Probationary Officer", totalPost: "75", eligibility: "Written Exam Qualified" }
+    ],
+    importantLinks: [
+        { label: "Check Result", url: "https://www.ecgc.in/" }
+    ]
+  },
+  "emrs-res": {
+    id: "emrs-res",
+    title: "EMRS Teaching / Non Teaching 2025 Result",
+    postDate: "Updated",
+    shortInfo: "Eklavya Model Residential Schools (EMRS) has declared the results for various Teaching and Non-Teaching posts including Principal, PGT, TGT, Hostel Warden, Lab Attendant, etc.",
+    importantDates: ["Exam Date: Dec 2025", "Result: Out"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "Teaching / Non-Teaching", totalPost: "10000+", eligibility: "Exam Qualified" }
+    ],
+    importantLinks: [
+        { label: "Download Result", url: "https://emrs.tribal.gov.in/" }
+    ]
+  },
+  "isro-icrb-res": {
+    id: "isro-icrb-res",
+    title: "ISRO ICRB Scientist Engineer 2025 Result",
+    postDate: "New",
+    shortInfo: "Indian Space Research Organisation (ISRO) Centralised Recruitment Board (ICRB) has released the result for Scientist/Engineer 'SC' Recruitment.",
+    importantDates: ["Exam: Jan 2026", "Result: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "Scientist/Engineer", totalPost: "Various", eligibility: "BE/B.Tech" }
+    ],
+    importantLinks: [
+        { label: "Check Result", url: "https://www.isro.gov.in/" }
+    ]
+  },
+  "ibps-score": {
+    id: "ibps-score",
+    title: "IBPS 14th Office Assistant, Scale I, II Score Card",
+    postDate: "Active",
+    shortInfo: "Institute of Banking Personnel Selection (IBPS) has released the Score Card for CRP RRBs XIV (14th) Office Assistant and Officer Scale I, II, III.",
+    importantDates: ["Result: Released"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "RRB XIV", totalPost: "Various", eligibility: "Exam Appeared" }
+    ],
+    importantLinks: [
+        { label: "Download Score Card", url: "https://www.ibps.in/" }
+    ]
+  },
+  "ssc-cgl-final": {
+    id: "ssc-cgl-final",
+    title: "SSC CGL 2025 Final Result",
+    postDate: "New",
+    shortInfo: "Staff Selection Commission (SSC) has declared the Final Result for Combined Graduate Level Examination (CGL) 2025. Allocation of Posts and Departments has been done.",
+    importantDates: ["Final Result: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "CGL 2025", totalPost: "8000+", eligibility: "Graduate" }
+    ],
+    importantLinks: [
+        { label: "Download Final Result", url: "https://ssc.gov.in/" }
+    ]
+  },
+  "sbi-clerk-res": {
+    id: "sbi-clerk-res",
+    title: "SBI Clerk Final Result 2025",
+    postDate: "New",
+    shortInfo: "State Bank of India (SBI) Junior Associate (Customer Support & Sales) Final Result 2025 declared.",
+    importantDates: ["Mains Exam: Jan 2026", "Result: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [
+        { postName: "Junior Associate", totalPost: "8000+", eligibility: "Mains Qualified" }
+    ],
+    importantLinks: [
+        { label: "Check Result", url: "https://sbi.co.in/" }
+    ]
+  },
 
+  "bihar-work-insp": {
+    id: "bihar-work-insp",
+    title: "Bihar Work Inspector (Mechanical) Online Form 2026",
+    postDate: "New",
+    shortInfo: "Bihar Staff Selection Commission (BSSC) invites applications for Work Inspector (Mechanical).",
+    importantDates: ["Start: Feb 2026", "End: March 2026"],
+    applicationFee: ["Gen/OBC: ₹ 540", "SC/ST: ₹ 135"],
+    ageLimit: ["18-37 Years"],
+    vacancyDetails: [{ postName: "Work Inspector", totalPost: "TBA", eligibility: "Diploma in Mechanical Engineering" }],
+    importantLinks: [{ label: "Apply Online", url: "https://bssc.bihar.gov.in/" }]
+  },
+  "delhi-hc-jja": {
+    id: "delhi-hc-jja",
+    title: "Delhi High Court JJA & Restorer Online Form 2026",
+    postDate: "New",
+    shortInfo: "Delhi High Court recruitment for Junior Judicial Assistant (JJA) and Restorer posts.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["₹ 600"],
+    ageLimit: ["18-27 Years"],
+    vacancyDetails: [{ postName: "JJA / Restorer", totalPost: "100+", eligibility: "Graduate + Typing" }],
+    importantLinks: [{ label: "Apply Online", url: "https://delhihighcourt.nic.in/" }]
+  },
+  "rrb-ntpc-city": {
+    id: "rrb-ntpc-city",
+    title: "Railway NTPC 10+2 Post 2024 Typing Test City",
+    postDate: "Check Now",
+    shortInfo: "RRB NTPC Typing Test Exam City details released.",
+    importantDates: ["Exam: March 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "NTPC Posts", totalPost: "NA", eligibility: "CBT Qualified" }],
+    importantLinks: [{ label: "Check City", url: "https://indianrailways.gov.in/" }]
+  },
+  "aadhar-update": {
+    id: "aadhar-update",
+    title: "UIDAI Aadhar Card Online Correction / Update Status",
+    postDate: "Active",
+    shortInfo: "Update your Aadhar details online or check status.",
+    importantDates: ["Always Open"],
+    applicationFee: ["₹ 50"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Aadhar Update", totalPost: "NA", eligibility: "Indian Resident" }],
+    importantLinks: [{ label: "Update Online", url: "https://myaadhaar.uidai.gov.in/" }]
+  },
+  "gds-2026": {
+    id: "gds-2026",
+    title: "Indian Post Office GDS Online Form 2026",
+    postDate: "Upcoming",
+    shortInfo: "India Post GDS Recruitment 2026 for Gramin Dak Sevak (BPM/ABPM).",
+    importantDates: ["Notification: March 2026"],
+    applicationFee: ["₹ 100"],
+    ageLimit: ["18-40 Years"],
+    vacancyDetails: [{ postName: "GDS", totalPost: "30000+", eligibility: "10th Pass + Cycle Riding" }],
+    importantLinks: [{ label: "Official Website", url: "https://indiapostgdsonline.gov.in/" }]
+  },
+  "up-lekhpal-edit": {
+    id: "up-lekhpal-edit",
+    title: "UP Lekhpal Edit / Correction Online Form 2026",
+    postDate: "Active",
+    shortInfo: "UPSSSC Lekhpal Application Form Correction Window.",
+    importantDates: ["Last Date: Feb 2026"],
+    applicationFee: ["₹ 25"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Lekhpal", totalPost: "NA", eligibility: "UPSSSC PET Score" }],
+    importantLinks: [{ label: "Edit Form", url: "https://upsssc.gov.in/" }]
+  },
+  "mp-iti-2026": {
+    id: "mp-iti-2026",
+    title: "MPESB MP ITI Training Officer Online Form 2026",
+    postDate: "Active",
+    shortInfo: "MP ITI Training Officer Recruitment.",
+    importantDates: ["Exam: June 2026"],
+    applicationFee: ["₹ 500"],
+    ageLimit: ["18-40 Years"],
+    vacancyDetails: [{ postName: "Training Officer", totalPost: "TBA", eligibility: "ITI / Diploma / Degree" }],
+    importantLinks: [{ label: "Apply Online", url: "https://esb.mp.gov.in/" }]
+  },
+  "sc-clerk": {
+    id: "sc-clerk",
+    title: "Supreme Court Law Clerk Cum Research Associate 2026",
+    postDate: "Active",
+    shortInfo: "Supreme Court Law Clerk Recruitment.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["₹ 500"],
+    ageLimit: ["20-32 Years"],
+    vacancyDetails: [{ postName: "Law Clerk", totalPost: "90", eligibility: "Law Degree" }],
+    importantLinks: [{ label: "Apply Online", url: "https://main.sci.gov.in/" }]
+  },
+  "rbi-attendant": {
+    id: "rbi-attendant",
+    title: "RBI Office Attendant Online Form 2026",
+    postDate: "Active",
+    shortInfo: "Reserve Bank of India Office Attendant Recruitment.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["₹ 450"],
+    ageLimit: ["18-25 Years"],
+    vacancyDetails: [{ postName: "Office Attendant", totalPost: "TBA", eligibility: "10th Pass" }],
+    importantLinks: [{ label: "Apply Online", url: "https://opportunities.rbi.org.in/" }]
+  },
+  "rrb-alp-city": {
+    id: "rrb-alp-city",
+    title: "Railway RRB ALP 01/2025 Exam City Details 2026",
+    postDate: "Active",
+    shortInfo: "Check Exam City for Assistant Loco Pilot.",
+    importantDates: ["Exam: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "ALP", totalPost: "5696", eligibility: "ITI / Diploma" }],
+    importantLinks: [{ label: "Check City", url: "https://indianrailways.gov.in/" }]
+  },
+  "up-police-exam": {
+    id: "up-police-exam",
+    title: "UP Police Constable Exam Date Notice 2026",
+    postDate: "Notice",
+    shortInfo: "UP Police Constable Re-Exam Date Announced.",
+    importantDates: ["Exam: June 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Constable", totalPost: "60244", eligibility: "12th Pass" }],
+    importantLinks: [{ label: "Download Notice", url: "https://uppbpb.gov.in/" }]
+  },
+  "ssc-mts-card": {
+    id: "ssc-mts-card",
+    title: "SSC MTS / Havaldar 2025 Exam Admit Card",
+    postDate: "Active",
+    shortInfo: "Download Admit Card for SSC MTS Exam.",
+    importantDates: ["Exam: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "MTS / Havaldar", totalPost: "TBA", eligibility: "10th Pass" }],
+    importantLinks: [{ label: "Download Admit Card", url: "https://ssc.gov.in/" }]
+  },
+  "afcat-card": {
+    id: "afcat-card",
+    title: "AFCAT 01/2026 Admit Card",
+    postDate: "Active",
+    shortInfo: "Indian Air Force AFCAT 01/2026 Admit Card.",
+    importantDates: ["Exam: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Flying / Ground Duty", totalPost: "300+", eligibility: "Graduate" }],
+    importantLinks: [{ label: "Download Admit Card", url: "https://afcat.cdac.in/" }]
+  },
+  "emrs-key": {
+    id: "emrs-key",
+    title: "EMRS Teaching / Non Teaching Final Answer Key 2026",
+    postDate: "Active",
+    shortInfo: "Eklavya Model Residential School Answer Key.",
+    importantDates: ["Released: Today"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "TGT / PGT / Hostel Warden", totalPost: "NA", eligibility: "Exam Appeared" }],
+    importantLinks: [{ label: "Download Key", url: "https://emrs.tribal.gov.in/" }]
+  },
+  "jee-main-key": {
+    id: "jee-main-key",
+    title: "NTA JEE Mains 2026 (Session I) Answer Key",
+    postDate: "Active",
+    shortInfo: "JEE Mains Session 1 Provisional Answer Key.",
+    importantDates: ["Released: Jan 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "B.Tech / B.Arch", totalPost: "NA", eligibility: "Exam Appeared" }],
+    importantLinks: [{ label: "Check Key", url: "https://jeemain.nta.ac.in/" }]
+  },
+  "ssc-cgl-key": {
+    id: "ssc-cgl-key",
+    title: "SSC CGL 2025 Mains Answer Key",
+    postDate: "Active",
+    shortInfo: "SSC CGL Tier II Answer Key.",
+    importantDates: ["Released: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "CGL Posts", totalPost: "NA", eligibility: "Mains Appeared" }],
+    importantLinks: [{ label: "Check Key", url: "https://ssc.gov.in/" }]
+  },
+  "ctet-key": {
+    id: "ctet-key",
+    title: "CTET Jan 2026 Official Answer Key",
+    postDate: "Active",
+    shortInfo: "CBSE CTET January 2026 Official Answer Key.",
+    importantDates: ["Released: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Teacher Eligibility", totalPost: "NA", eligibility: "Exam Appeared" }],
+    importantLinks: [{ label: "Download Key", url: "https://ctet.nic.in/" }]
+  },
+  "neet-ug-2025": {
+    id: "neet-ug-2025",
+    title: "NTA NEET UG 2025 Admission Online Correction",
+    postDate: "Active",
+    shortInfo: "Correction Window for NEET UG 2025 Application.",
+    importantDates: ["Last Date: Feb 2026"],
+    applicationFee: ["Varies"],
+    ageLimit: ["17+ Years"],
+    vacancyDetails: [{ postName: "MBBS / BDS Admission", totalPost: "NA", eligibility: "12th PCB" }],
+    importantLinks: [{ label: "Correction Login", url: "https://exams.nta.ac.in/NEET/" }]
+  },
+  "ctet-2026-form": {
+    id: "ctet-2026-form",
+    title: "CTET 2026 Entrance Exam Online Form",
+    postDate: "Upcoming",
+    shortInfo: "Apply for CTET July 2026.",
+    importantDates: ["Start: March 2026"],
+    applicationFee: ["₹ 1000"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Teacher Eligibility", totalPost: "NA", eligibility: "B.Ed / D.El.Ed" }],
+    importantLinks: [{ label: "Apply Online", url: "https://ctet.nic.in/" }]
+  },
+  "afcat-01-2026": {
+    id: "afcat-01-2026",
+    title: "Airforce AFCAT 01/2026 Batch Online Form",
+    postDate: "Closed",
+    shortInfo: "AFCAT 01/2026 Recruitment.",
+    importantDates: ["Exam: Feb 2026"],
+    applicationFee: ["₹ 550"],
+    ageLimit: ["20-24 Years"],
+    vacancyDetails: [{ postName: "Officer", totalPost: "317", eligibility: "Graduate" }],
+    importantLinks: [{ label: "Official Website", url: "https://afcat.cdac.in/" }]
+  },
+  "bihar-iti": {
+    id: "bihar-iti",
+    title: "Bihar ITI CAT Online Counselling 2025",
+    postDate: "Active",
+    shortInfo: "Bihar ITI Admission Counselling.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["NA"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "ITI Admission", totalPost: "NA", eligibility: "10th Pass" }],
+    importantLinks: [{ label: "Counselling Login", url: "https://bceceboard.bihar.gov.in/" }]
+  },
+  "ofss-bihar": {
+    id: "ofss-bihar",
+    title: "OFSS Bihar 11th Admission 2025 Online Form",
+    postDate: "Upcoming",
+    shortInfo: "Bihar Inter (11th) Admission via OFSS.",
+    importantDates: ["Start: April 2026"],
+    applicationFee: ["₹ 350"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "11th Admission", totalPost: "NA", eligibility: "10th Pass" }],
+    importantLinks: [{ label: "Official Website", url: "https://ofssbihar.in/" }]
+  },
+  "raj-agri": {
+    id: "raj-agri",
+    title: "Rajasthan RSSB Agriculture Supervisor Online Form 2026",
+    postDate: "New",
+    shortInfo: "Rajasthan Agriculture Supervisor Recruitment.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["₹ 600"],
+    ageLimit: ["18-40 Years"],
+    vacancyDetails: [{ postName: "Agriculture Supervisor", totalPost: "430", eligibility: "B.Sc Agriculture" }],
+    importantLinks: [{ label: "Apply Online", url: "https://rsmssb.rajasthan.gov.in/" }]
+  },
+  "raj-ldc": {
+    id: "raj-ldc",
+    title: "Rajasthan RSSB LDC, Jr Assistant Online Form 2026",
+    postDate: "New",
+    shortInfo: "Rajasthan LDC Recruitment.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["₹ 600"],
+    ageLimit: ["18-40 Years"],
+    vacancyDetails: [{ postName: "LDC / Jr Assistant", totalPost: "4000+", eligibility: "12th + RSCIT" }],
+    importantLinks: [{ label: "Apply Online", url: "https://rsmssb.rajasthan.gov.in/" }]
+  },
+  "haryana-police": {
+    id: "haryana-police",
+    title: "Haryana Police Constable Online Form 2026",
+    postDate: "New",
+    shortInfo: "Haryana Staff Selection Commission (HSSC) Police Constable.",
+    importantDates: ["Start: Feb 2026"],
+    applicationFee: ["Free"],
+    ageLimit: ["18-25 Years"],
+    vacancyDetails: [{ postName: "Constable", totalPost: "6000", eligibility: "12th Pass + CET Qualified" }],
+    importantLinks: [{ label: "Apply Online", url: "https://hssc.gov.in/" }]
+  },
+  "htet-2025": {
+    id: "htet-2025",
+    title: "Haryana Teacher Test Eligibility HTET Online 2025",
+    postDate: "Active",
+    shortInfo: "Haryana Teacher Eligibility Test.",
+    importantDates: ["Exam: March 2026"],
+    applicationFee: ["₹ 1000"],
+    ageLimit: ["NA"],
+    vacancyDetails: [{ postName: "Teacher Eligibility", totalPost: "NA", eligibility: "B.Ed / JBT" }],
+    importantLinks: [{ label: "Apply Online", url: "https://bseh.org.in/" }]
+  },
+  "raj-stat": {
+    id: "raj-stat",
+    title: "Rajasthan Statistical Officer Online Form 2025",
+    postDate: "Active",
+    shortInfo: "RPSC Statistical Officer Recruitment.",
+    importantDates: ["Exam: Feb 2026"],
+    applicationFee: ["₹ 600"],
+    ageLimit: ["21-40 Years"],
+    vacancyDetails: [{ postName: "Statistical Officer", totalPost: "72", eligibility: "Master Degree in Economics/Stats" }],
+    importantLinks: [{ label: "Apply Online", url: "https://rpsc.rajasthan.gov.in/" }]
+  },
+  "raj-ayush": {
+    id: "raj-ayush",
+    title: "Rajsthan RSSB Ayush Officer Online Form 2025",
+    postDate: "Active",
+    shortInfo: "Rajasthan Ayush Department Recruitment.",
+    importantDates: ["Start: Jan 2026"],
+    applicationFee: ["₹ 600"],
+    ageLimit: ["21-40 Years"],
+    vacancyDetails: [{ postName: "Ayush Doctor", totalPost: "TBA", eligibility: "BAMS / BUMS / BHMS" }],
+    importantLinks: [{ label: "Apply Online", url: "https://rsmssb.rajasthan.gov.in/" }]
+  },
   // --- LATEST JOBS ---
   "ssc-cgl-2026": {
     id: "ssc-cgl-2026",
