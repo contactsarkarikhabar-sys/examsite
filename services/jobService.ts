@@ -46,9 +46,21 @@ const getInitialSections = (): SectionData[] => {
   return JSON.parse(JSON.stringify(MOCK_SECTIONS));
 };
 
+// --- CACHING LOGIC ---
+let cachedSections: SectionData[] | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
+
 export const jobService = {
-  // Fetch all jobs from Backend API
-  getAllJobs: async (): Promise<SectionData[]> => {
+  // Fetch all jobs from Backend API (With Caching)
+  getAllJobs: async (forceRefresh = false): Promise<SectionData[]> => {
+    const now = Date.now();
+
+    // Return cached if available and fresh
+    if (!forceRefresh && cachedSections && (now - lastFetchTime < CACHE_DURATION)) {
+      return JSON.parse(JSON.stringify(cachedSections)); // Return copy to avoid mutation
+    }
+
     try {
       const workerUrl = import.meta.env.VITE_WORKER_URL || '';
       const apiUrl = workerUrl ? `${workerUrl}/api/jobs` : '/api/jobs';
@@ -97,8 +109,15 @@ export const jobService = {
           }
         }
       } catch (err) {
-        console.warn('API fetch failed, showing only mock data', err);
+        console.warn('API fetch failed, using mock/cached data', err);
+        // If API fails but we have cache (even if old), return it? 
+        // Better to return the "Fresh Mock" sections we just created to be safe,
+        // OR return stale cache. For now, let's stick to returning the sections we prepared (Mock).
       }
+
+      // Update Cache
+      cachedSections = sections;
+      lastFetchTime = now;
 
       return sections;
 
