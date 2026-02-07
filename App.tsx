@@ -292,41 +292,26 @@ const App: React.FC = () => {
 
     // Marquee Click Handler
     const handleMarqueeClick = (text: string, id?: string) => {
-        // If we have a direct job ID, navigate to it immediately
+        // 1. Direct ID (Best Case)
         if (id) {
             handleJobClick(id, text);
             return;
         }
 
-        // Fallback: Try to find a matching job in available sections
-        jobService.getAllJobs().then((allSections) => {
-             let foundJobId: string | null = null;
-             let foundJobTitle = '';
-
-             // Normalize for better matching
-             const cleanText = text.toLowerCase().replace(/\s+/g, ' ').trim();
-
-             for (const section of allSections) {
-                 for (const item of section.items) {
-                     const itemTitle = item.title.toLowerCase().replace(/\s+/g, ' ').trim();
-                     
-                     // Check for exact match or strong partial match
-                     if (itemTitle === cleanText || itemTitle.includes(cleanText) || cleanText.includes(itemTitle)) {
-                         foundJobId = item.id;
-                         foundJobTitle = item.title;
-                         break;
-                     }
-                 }
-                 if (foundJobId) break;
+        // 2. Fallback: Lookup in current sections state
+        // Remove emoji and trim to match title
+        const cleanText = text.replace(/🔴/g, '').trim();
+        
+        for (const section of sections) {
+             const found = section.items.find(item => item.title === cleanText || cleanText.includes(item.title) || item.title.includes(cleanText));
+             if (found) {
+                 handleJobClick(found.id, found.title);
+                 return;
              }
-
-             if (foundJobId) {
-                 handleJobClick(foundJobId, foundJobTitle);
-             } else {
-                 // Fallback to search if no direct job found
-                 handleSearch(text);
-             }
-        });
+        }
+        
+        // 3. Last Resort: Search
+        handleSearch(text);
     };
 
     // PWA Install handler
