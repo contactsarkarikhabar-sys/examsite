@@ -423,7 +423,16 @@ ${detailsCode}
                 resetForm();
             }
         } else {
-            setMessage({ type: 'error', text: result.message });
+            const msg = String(result.message || '');
+            if (/not\s*found/i.test(msg)) {
+                jobService.invalidateJobsCache();
+                setPendingJobs(prev => prev.filter(j => String(j.id) !== String(jobId)));
+                await loadPending();
+                setMessage({ type: 'success', text: `🗑️ Already deleted. List refreshed.` });
+            } else {
+                await loadPending();
+                setMessage({ type: 'error', text: result.message });
+            }
         }
     };
 

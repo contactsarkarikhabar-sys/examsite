@@ -409,6 +409,7 @@ export const jobService = {
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs/${encodeURIComponent(jobId)}` : `/api/admin/jobs/${encodeURIComponent(jobId)}`;
     const response = await fetch(apiUrl, {
       method: 'DELETE',
+      cache: 'no-store',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });
     let data: any = null;

@@ -141,6 +141,18 @@ function getAdminPassword(env: Env): string {
     return String((env as any).ADMIN_SECRET || env.ADMIN_PASSWORD || '');
 }
 
+function decodePathParam(value: string): string {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
+function isSafeJobId(id: string): boolean {
+    return /^[a-z0-9][a-z0-9-]{0,99}$/i.test(id);
+}
+
 // Get client IP
 function getClientIP(request: Request): string {
     return request.headers.get('CF-Connecting-IP') ||
@@ -186,6 +198,7 @@ function jsonResponse(data: object, status = 200, origin: string | null = null):
         status,
         headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
             ...getCorsHeaders(origin)
         },
     });
@@ -760,6 +773,15 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
         const importantLinks = body.importantLinks || [];
         const applyLink = sanitizeString(body.applyLink || importantLinks?.[0]?.url || '', 2000);
 
+        // Check if exists
+        const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
+            .bind(id)
+            .first();
+
+        if (!existing && !isSafeJobId(id)) {
+            return errorResponse('Invalid ID. Use only letters, numbers, and hyphen.', 400, origin);
+        }
+
         const verdict = validateJob({
             title,
             shortInfo,
@@ -778,11 +800,6 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
         const vacancyDetailsJson = vacancyColumns.length
             ? JSON.stringify({ columns: vacancyPayload.columns, rows: vacancyPayload.rows })
             : JSON.stringify(vacancyPayload.rows);
-
-        // Check if exists
-        const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
-            .bind(id)
-            .first();
 
         if (existing) {
             // Update
@@ -1235,7 +1252,7 @@ export default {
             if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
-            const jobId = path.replace('/api/admin/jobs/', '');
+            const jobId = decodePathParam(path.replace('/api/admin/jobs/', ''));
             const job = await env.DB.prepare('SELECT * FROM job_details WHERE id = ?')
                 .bind(jobId)
                 .first();
@@ -1290,7 +1307,7 @@ export default {
             if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
-            const jobId = path.replace('/api/admin/approve/', '');
+            const jobId = decodePathParam(path.replace('/api/admin/approve/', ''));
             await env.DB.prepare(`UPDATE job_details SET is_active = 1, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
             return jsonResponse({ success: true, message: 'Approved' }, 200, origin);
         }
@@ -1304,7 +1321,7 @@ export default {
             if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
-            const jobId = path.replace('/api/admin/reject/', '');
+            const jobId = decodePathParam(path.replace('/api/admin/reject/', ''));
             await env.DB.prepare(`UPDATE job_details SET is_active = -1, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
             return jsonResponse({ success: true, message: 'Rejected' }, 200, origin);
         }
@@ -1315,7 +1332,7 @@ export default {
         }
 
         if (path.startsWith('/api/jobs/') && request.method === 'GET') {
-            const jobId = path.replace('/api/jobs/', '');
+            const jobId = decodePathParam(path.replace('/api/jobs/', ''));
             return handleGetJob(request, env, jobId);
         }
 
@@ -1324,7 +1341,7 @@ export default {
         }
 
         if (path.startsWith('/api/admin/jobs/') && request.method === 'DELETE') {
-            const jobId = path.replace('/api/admin/jobs/', '');
+            const jobId = decodePathParam(path.replace('/api/admin/jobs/', ''));
             return handleDeleteJob(request, env, jobId);
         }
 
