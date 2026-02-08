@@ -399,18 +399,26 @@ ${detailsCode}
     };
 
     // Delete job from database
-    const handleDeleteFromDb = async (jobId: string) => {
-        if (!confirm(`Are you sure you want to delete "${jobId}"?`)) {
-            return;
+    const handleDeleteFromDb = async (jobId: string, jobTitle?: string, skipConfirm = false) => {
+        if (!skipConfirm) {
+            const ok = window.confirm(`Delete this job?\n\n${jobTitle || jobId}\n\nID: ${jobId}`);
+            if (!ok) return;
         }
 
         setIsLoading(true);
+        setMessage(null);
         const result = await jobService.deleteJob(jobId, password);
         setIsLoading(false);
 
         if (result.success) {
             setMessage({ type: 'success', text: `🗑️ ${result.message}` });
-            resetForm();
+            setPendingJobs(prev => prev.filter(j => String(j.id) !== String(jobId)));
+            if (activeTab === 'pending') {
+                await loadPending();
+            }
+            if (isEditMode && String(fullJobForm.id) === String(jobId)) {
+                resetForm();
+            }
         } else {
             setMessage({ type: 'error', text: result.message });
         }
@@ -1061,7 +1069,7 @@ ${detailsCode}
                                             {isEditMode && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleDeleteFromDb(fullJobForm.id)}
+                                                    onClick={() => handleDeleteFromDb(fullJobForm.id, fullJobForm.title)}
                                                     disabled={isLoading}
                                                     className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2"
                                                 >
@@ -1204,11 +1212,7 @@ ${detailsCode}
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
-                                                                const ok = window.confirm(`Delete this job?\n\n${j.title}\n\nID: ${j.id}`);
-                                                                if (!ok) return;
-                                                                handleDeleteFromDb(j.id);
-                                                            }}
+                                                            onClick={() => handleDeleteFromDb(j.id, j.title)}
                                                             disabled={isLoading}
                                                             className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
                                                         >

@@ -374,7 +374,8 @@ export const jobService = {
     adminPassword: string
   ): Promise<{ success: boolean; message: string }> => {
     const workerUrl = getWorkerBaseUrl();
-    const response = await fetch(`${workerUrl}/api/admin/jobs`, {
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs` : '/api/admin/jobs';
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -382,7 +383,14 @@ export const jobService = {
       },
       body: JSON.stringify(jobData),
     });
-    return await response.json() as { success: boolean; message: string };
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {}
+    if (!response.ok || data?.success === false) {
+      return { success: false, message: data?.message || data?.error || `Request failed (${response.status})` };
+    }
+    return { success: true, message: data?.message || 'Saved' };
   },
 
   deleteJob: async (
@@ -395,7 +403,14 @@ export const jobService = {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });
-    return await response.json() as { success: boolean; message: string };
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {}
+    if (!response.ok || data?.success === false) {
+      return { success: false, message: data?.message || data?.error || `Request failed (${response.status})` };
+    }
+    return { success: true, message: data?.message || 'Deleted' };
   },
 
   getPendingJobs: async (adminPassword: string): Promise<Array<{ id: string; title: string; post_date?: string }>> => {
