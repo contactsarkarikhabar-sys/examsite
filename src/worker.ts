@@ -168,7 +168,9 @@ function getCorsHeaders(origin: string | null): HeadersInit {
     };
     if (allowedOrigin) {
         headers['Access-Control-Allow-Origin'] = allowedOrigin;
-    } else if (!origin) {
+    } else if (origin) {
+        headers['Access-Control-Allow-Origin'] = origin;
+    } else {
         headers['Access-Control-Allow-Origin'] = '*';
     }
     return headers;

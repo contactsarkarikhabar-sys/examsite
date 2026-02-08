@@ -88,8 +88,11 @@ const getWorkerBaseUrl = (): string => {
     if (host === 'localhost' || host === '127.0.0.1') {
       return 'http://127.0.0.1:8787';
     }
+    if (host === 'examsite.in' || host === 'www.examsite.in') {
+      return '';
+    }
   } catch {}
-  return '';
+  return 'https://examsite.in';
 };
 
 export const jobService = {
