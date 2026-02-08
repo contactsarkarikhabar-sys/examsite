@@ -80,6 +80,11 @@ let cachedSections: SectionData[] | null = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
 
+const invalidateJobsCache = () => {
+  cachedSections = null;
+  lastFetchTime = 0;
+};
+
 const getWorkerBaseUrl = (): string => {
   const configured = (import.meta.env.VITE_WORKER_URL || '').trim().replace(/\/$/, '');
   if (configured) return configured;
@@ -96,6 +101,7 @@ const getWorkerBaseUrl = (): string => {
 };
 
 export const jobService = {
+  invalidateJobsCache,
   // Fetch all jobs from Backend API (With Caching)
   getAllJobs: async (forceRefresh = false): Promise<SectionData[]> => {
     const now = Date.now();

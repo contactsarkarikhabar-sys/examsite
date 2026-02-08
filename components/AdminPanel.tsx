@@ -170,6 +170,7 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         setIsLoading(false);
 
         if (result.success) {
+            jobService.invalidateJobsCache();
             setMessage({
                 type: 'success',
                 text: `✅ Job posted! ${result.notificationsSent || 0} emails sent.`
@@ -391,6 +392,7 @@ ${detailsCode}
         setIsLoading(false);
 
         if (result.success) {
+            jobService.invalidateJobsCache();
             setMessage({ type: 'success', text: `✅ ${result.message}` });
             // Optionally reset form after save
         } else {
@@ -411,6 +413,7 @@ ${detailsCode}
         setIsLoading(false);
 
         if (result.success) {
+            jobService.invalidateJobsCache();
             setMessage({ type: 'success', text: `🗑️ ${result.message}` });
             setPendingJobs(prev => prev.filter(j => String(j.id) !== String(jobId)));
             if (activeTab === 'pending') {
@@ -477,6 +480,7 @@ ${detailsCode}
         const result = await jobService.cleanupJunkJobs(password);
         setIsLoading(false);
         if (result.success) {
+            jobService.invalidateJobsCache();
             setMessage({ type: 'success', text: '✅ Junk jobs cleaned' });
             if (activeTab === 'pending') {
                 loadPending();
@@ -508,6 +512,7 @@ ${detailsCode}
         const result = await jobService.approveJob(jobId, password);
         setIsLoading(false);
         if (result.success) {
+            jobService.invalidateJobsCache();
             setMessage({ type: 'success', text: '✅ Approved' });
             loadPending();
         } else {
@@ -521,6 +526,7 @@ ${detailsCode}
         const result = await jobService.rejectJob(jobId, password);
         setIsLoading(false);
         if (result.success) {
+            jobService.invalidateJobsCache();
             setMessage({ type: 'success', text: '✅ Rejected' });
             loadPending();
         } else {
