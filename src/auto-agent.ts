@@ -256,7 +256,7 @@ export class AutoAgent {
             Source 3 (Content): ${pageContext}
 
             RULES:
-            1. **EXTRACT ANYTHING**: If exact dates/fees are missing, INFER them from context or use "Check Notification".
+            1. **DO NOT GUESS**: If exact dates/fees are missing, use "Check Notification" / "See Notification" (do not invent values).
             2. **DO NOT FAIL**: Mispelled words or partial data is OKAY. Return the best possible JSON.
             3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, Other].
             
@@ -299,11 +299,16 @@ export class AutoAgent {
             const parsed = JSON.parse(cleanText);
 
             // Normalize fields to ensure strings for DB
-            const sanitizeUrl = (u: string) => (u || '').replace(/`/g, '').trim();
+            const sanitizeUrl = (u: string) => {
+                const cleaned = (u || '').replace(/`/g, '').trim();
+                if (!cleaned) return '';
+                if (cleaned.startsWith('https://') || cleaned.startsWith('http://')) return cleaned;
+                return '';
+            };
             const links = Array.isArray(parsed.importantLinks)
                 ? parsed.importantLinks.map((l: any) => ({
                     label: String(l.label || 'Link'),
-                    url: sanitizeUrl(String(l.url || result.link))
+                    url: sanitizeUrl(String(l.url || '')) || sanitizeUrl(result.link)
                 }))
                 : [{ label: "Apply Link", url: sanitizeUrl(result.link) }];
             const importantDatesArr = Array.isArray(parsed.importantDates)
@@ -396,17 +401,21 @@ export class AutoAgent {
     private async fetchPageContent(url: string): Promise<string | null> {
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+            const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
             const response = await fetch(url, {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-IN,en;q=0.9,hi;q=0.8'
                 },
                 signal: controller.signal
             });
             clearTimeout(timeout);
 
             if (!response.ok) return null;
+            const contentType = (response.headers.get('content-type') || '').toLowerCase();
+            if (contentType.includes('application/pdf')) return null;
 
             const html = await response.text();
             // Simple strip tags to get text content
