@@ -12,7 +12,8 @@ import { validateJob } from './agent-policy';
 interface Env {
     DB: D1Database;
     RESEND_API_KEY: string;
-    ADMIN_PASSWORD: string;
+    ADMIN_PASSWORD?: string;
+    ADMIN_SECRET?: string;
     SITE_URL: string;
     GOOGLE_SEARCH_API_KEY: string;
     GOOGLE_SEARCH_CX: string;
@@ -134,6 +135,10 @@ function secureCompare(a: unknown, b: unknown): boolean {
         result |= a.charCodeAt(i) ^ b.charCodeAt(i);
     }
     return result === 0;
+}
+
+function getAdminPassword(env: Env): string {
+    return String((env as any).ADMIN_SECRET || env.ADMIN_PASSWORD || '');
 }
 
 // Get client IP
@@ -364,6 +369,10 @@ async function handlePostJob(request: Request, env: Env): Promise<Response> {
         return errorResponse('Rate limit exceeded', 429, origin);
     }
 
+    if (!getAdminPassword(env)) {
+        return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+    }
+
     // Check admin auth with secure comparison
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -371,7 +380,7 @@ async function handlePostJob(request: Request, env: Env): Promise<Response> {
     }
 
     const providedPassword = authHeader.slice(7);
-    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+    if (!secureCompare(providedPassword, getAdminPassword(env))) {
         // Add delay to prevent brute force
         await new Promise(resolve => setTimeout(resolve, 1000));
         return errorResponse('Unauthorized', 401, origin);
@@ -460,7 +469,7 @@ async function handlePostJob(request: Request, env: Env): Promise<Response> {
 // Handler: Admin - Get subscribers count
 async function handleGetSubscribers(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
-    if (!env.ADMIN_PASSWORD) {
+    if (!getAdminPassword(env)) {
         return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
     }
 
@@ -470,7 +479,7 @@ async function handleGetSubscribers(request: Request, env: Env): Promise<Respons
     }
 
     const providedPassword = authHeader.slice(7);
-    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+    if (!secureCompare(providedPassword, getAdminPassword(env))) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         return errorResponse('Unauthorized', 401, origin);
     }
@@ -716,7 +725,7 @@ async function handleGetJob(request: Request, env: Env, jobId: string): Promise<
 // Handler: Create or Update job (admin only)
 async function handleSaveJob(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
-    if (!env.ADMIN_PASSWORD) {
+    if (!getAdminPassword(env)) {
         return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
     }
 
@@ -726,7 +735,7 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
         return errorResponse('Unauthorized', 401, origin);
     }
     const providedPassword = authHeader.slice(7);
-    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+    if (!secureCompare(providedPassword, getAdminPassword(env))) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         return errorResponse('Unauthorized', 401, origin);
     }
@@ -838,7 +847,7 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
 // Handler: Delete job (admin only)
 async function handleDeleteJob(request: Request, env: Env, jobId: string): Promise<Response> {
     const origin = request.headers.get('Origin');
-    if (!env.ADMIN_PASSWORD) {
+    if (!getAdminPassword(env)) {
         return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
     }
 
@@ -848,14 +857,13 @@ async function handleDeleteJob(request: Request, env: Env, jobId: string): Promi
         return errorResponse('Unauthorized', 401, origin);
     }
     const providedPassword = authHeader.slice(7);
-    if (!secureCompare(providedPassword, env.ADMIN_PASSWORD)) {
+    if (!secureCompare(providedPassword, getAdminPassword(env))) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         return errorResponse('Unauthorized', 401, origin);
     }
 
     try {
-        // Soft delete
-        await env.DB.prepare('UPDATE job_details SET is_active = -1, updated_at = datetime("now") WHERE id = ?')
+        await env.DB.prepare('DELETE FROM job_details WHERE id = ?')
             .bind(jobId)
             .run();
 
@@ -919,13 +927,13 @@ export default {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');
             const queryKey = new URL(request.url).searchParams.get('key');
-            if (!env.ADMIN_PASSWORD) {
+            if (!getAdminPassword(env)) {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
             let isAuthorized = false;
-            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 isAuthorized = true;
-            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+            } else if (queryKey && secureCompare(queryKey, getAdminPassword(env))) {
                 isAuthorized = true;
             }
             if (!isAuthorized) {
@@ -955,13 +963,13 @@ export default {
         if (path === '/api/admin/ping' && request.method === 'GET') {
             const queryKey = url.searchParams.get('key');
             const authHeader = request.headers.get('Authorization');
-            if (!env.ADMIN_PASSWORD) {
+            if (!getAdminPassword(env)) {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
             let isAuthorized = false;
-            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 isAuthorized = true;
-            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+            } else if (queryKey && secureCompare(queryKey, getAdminPassword(env))) {
                 isAuthorized = true;
             }
             if (!isAuthorized) {
@@ -973,13 +981,13 @@ export default {
         if (path === '/api/admin/quick-add' && (request.method === 'GET' || request.method === 'POST')) {
             const queryKey = url.searchParams.get('key');
             const authHeader = request.headers.get('Authorization');
-            if (!env.ADMIN_PASSWORD) {
+            if (!getAdminPassword(env)) {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
             let isAuthorized = false;
-            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 isAuthorized = true;
-            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+            } else if (queryKey && secureCompare(queryKey, getAdminPassword(env))) {
                 isAuthorized = true;
             }
             if (!isAuthorized) {
@@ -1024,13 +1032,13 @@ export default {
         if (path === '/api/admin/jobs/quick-add' && (request.method === 'GET' || request.method === 'POST')) {
             const queryKey = url.searchParams.get('key');
             const authHeader = request.headers.get('Authorization');
-            if (!env.ADMIN_PASSWORD) {
+            if (!getAdminPassword(env)) {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
             let isAuthorized = false;
-            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 isAuthorized = true;
-            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+            } else if (queryKey && secureCompare(queryKey, getAdminPassword(env))) {
                 isAuthorized = true;
             }
             if (!isAuthorized) {
@@ -1079,15 +1087,15 @@ export default {
             const authHeader = request.headers.get('Authorization');
 
             // Check if ADMIN_PASSWORD is set
-            if (!env.ADMIN_PASSWORD) {
+            if (!getAdminPassword(env)) {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
 
             // Verify Auth (Header OR Query Param)
             let isAuthorized = false;
-            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 isAuthorized = true;
-            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+            } else if (queryKey && secureCompare(queryKey, getAdminPassword(env))) {
                 isAuthorized = true;
             }
 
@@ -1113,13 +1121,13 @@ export default {
             const url = new URL(request.url);
             const queryKey = url.searchParams.get('key');
             const authHeader = request.headers.get('Authorization');
-            if (!env.ADMIN_PASSWORD) {
+            if (!getAdminPassword(env)) {
                 return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
             }
             let isAuthorized = false;
-            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (authHeader && authHeader.startsWith('Bearer ') && secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 isAuthorized = true;
-            } else if (queryKey && secureCompare(queryKey, env.ADMIN_PASSWORD)) {
+            } else if (queryKey && secureCompare(queryKey, getAdminPassword(env))) {
                 isAuthorized = true;
             }
             if (!isAuthorized) {
@@ -1163,7 +1171,10 @@ export default {
         if (path === '/api/admin/pending' && request.method === 'GET') {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (!getAdminPassword(env)) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
             try {
@@ -1183,7 +1194,10 @@ export default {
         if (path === '/api/admin/jobs' && request.method === 'GET') {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (!getAdminPassword(env)) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
             try {
@@ -1210,7 +1224,10 @@ export default {
         if (path.startsWith('/api/admin/jobs/') && request.method === 'GET') {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (!getAdminPassword(env)) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
             const jobId = path.replace('/api/admin/jobs/', '');
@@ -1262,7 +1279,10 @@ export default {
         if (path.startsWith('/api/admin/approve/') && request.method === 'POST') {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (!getAdminPassword(env)) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
             const jobId = path.replace('/api/admin/approve/', '');
@@ -1273,7 +1293,10 @@ export default {
         if (path.startsWith('/api/admin/reject/') && request.method === 'POST') {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');
-            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+            if (!getAdminPassword(env)) {
+                return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+            }
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), getAdminPassword(env))) {
                 return errorResponse('Unauthorized', 401, origin);
             }
             const jobId = path.replace('/api/admin/reject/', '');
