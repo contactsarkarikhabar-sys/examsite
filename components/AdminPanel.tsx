@@ -38,6 +38,7 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
 
     // Stats
     const [stats, setStats] = useState({ total: 0, verified: 0 });
+    const [recentSubscribers, setRecentSubscribers] = useState<Array<{ name?: string; qualification?: string; location?: string; created_at?: string }>>([]);
 
     // Quick Job Form (for email notification)
     const [quickJobForm, setQuickJobForm] = useState({
@@ -84,6 +85,7 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         const data: any = await jobService.getSubscribersCount(password);
         if (typeof data?.total === 'number' && data.total >= 0) {
             setStats({ total: data.total, verified: data.verified });
+            setRecentSubscribers(Array.isArray(data.recentSubscribers) ? data.recentSubscribers : []);
         }
     };
 
@@ -576,6 +578,35 @@ ${detailsCode}
                                     <p className="text-2xl font-bold text-green-700">{stats.verified}</p>
                                     <p className="text-xs text-green-600 uppercase">Verified</p>
                                 </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="text-sm font-bold text-gray-800">Recent Subscribers</div>
+                                    <button
+                                        type="button"
+                                        onClick={loadStats}
+                                        disabled={isLoading}
+                                        className="text-xs font-bold text-blue-700 hover:text-blue-800"
+                                    >
+                                        Refresh
+                                    </button>
+                                </div>
+                                {recentSubscribers.length === 0 ? (
+                                    <div className="text-sm text-gray-600">No recent subscribers.</div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {recentSubscribers.slice(0, 10).map((s, idx) => (
+                                            <div key={idx} className="bg-white border border-gray-200 rounded-lg p-3">
+                                                <div className="text-sm font-bold text-gray-800">{String(s?.name || '—')}</div>
+                                                <div className="text-xs text-gray-600">
+                                                    {[s?.qualification, s?.location].filter(Boolean).join(' • ') || '—'}
+                                                </div>
+                                                <div className="text-[11px] text-gray-500">{String(s?.created_at || '')}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Message */}

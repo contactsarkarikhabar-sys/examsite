@@ -307,11 +307,15 @@ export const jobService = {
       });
       const data = await response.json() as any;
       if (!response.ok || data?.success === false) {
-        return { total: -1, verified: 0, error: data?.error || 'Unauthorized' };
+        return { total: -1, verified: 0, recentSubscribers: [], error: data?.error || 'Unauthorized' };
       }
-      return { total: data.totalSubscribers || 0, verified: data.verifiedSubscribers || 0 };
+      return {
+        total: data.totalSubscribers || 0,
+        verified: data.verifiedSubscribers || 0,
+        recentSubscribers: Array.isArray(data.recentSubscribers) ? data.recentSubscribers : []
+      };
     } catch (e) {
-      return { total: -2, verified: 0, error: e instanceof Error ? e.message : String(e) };
+      return { total: -2, verified: 0, recentSubscribers: [], error: e instanceof Error ? e.message : String(e) };
     }
   },
 

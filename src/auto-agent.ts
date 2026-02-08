@@ -30,9 +30,133 @@ interface ParsedJob {
 
 export class AutoAgent {
     private env: Env;
+    private recentJobCache: Array<{ id: string; title: string; category?: string; short_info?: string; important_dates?: string; important_links?: string; apply_link?: string; is_active?: number }> | null = null;
 
     constructor(env: Env) {
         this.env = env;
+    }
+
+    private normalizeExamKey(text: string): string {
+        const s = String(text || '')
+            .toLowerCase()
+            .replace(/\b(19|20)\d{2}\b/g, ' ')
+            .replace(/\b(online\s*form|apply\s*online|application|registration|recruitment|notification|advertisement|adv\b|result|final\s*result|score\s*card|cut\s*off|merit\s*list|admit\s*card|hall\s*ticket|call\s*letter|answer\s*key|syllabus|exam|entrance|updated?)\b/g, ' ')
+            .replace(/[^a-z0-9\s]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        return s;
+    }
+
+    private tokenSet(s: string): Set<string> {
+        const tokens = String(s || '')
+            .toLowerCase()
+            .split(/\s+/g)
+            .map(t => t.trim())
+            .filter(t => t.length >= 3);
+        return new Set(tokens);
+    }
+
+    private jaccard(a: Set<string>, b: Set<string>): number {
+        if (a.size === 0 || b.size === 0) return 0;
+        let inter = 0;
+        for (const x of a) if (b.has(x)) inter += 1;
+        const union = a.size + b.size - inter;
+        return union === 0 ? 0 : inter / union;
+    }
+
+    private inferStageCategory(title: string, shortInfo: string, applyLink: string): 'Results' | 'Admit Card' | 'Answer Key' | 'Syllabus' | 'Admission' | 'Latest Jobs' {
+        const t = `${title || ''} ${shortInfo || ''} ${applyLink || ''}`.toLowerCase();
+        if (/(answer\s*key)/i.test(t)) return 'Answer Key';
+        if (/(admit\s*card|hall\s*ticket|call\s*letter)/i.test(t)) return 'Admit Card';
+        if (/(result|final\s*result|score\s*card|cut\s*off|merit\s*list)/i.test(t)) return 'Results';
+        if (/(syllabus)/i.test(t)) return 'Syllabus';
+        if (/(admission|entrance|counselling|counseling)/i.test(t)) return 'Admission';
+        return 'Latest Jobs';
+    }
+
+    private parseDateFlexible(input: string): Date | null {
+        const s = String(input || '').replace(/\s+/g, ' ').trim();
+        if (!s) return null;
+
+        const dmy = s.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+        if (dmy) {
+            const dd = Number(dmy[1]);
+            const mm = Number(dmy[2]);
+            let yy = Number(dmy[3]);
+            if (yy < 100) yy = 2000 + yy;
+            const dt = new Date(yy, mm - 1, dd, 23, 59, 59, 999);
+            if (!Number.isNaN(dt.getTime())) return dt;
+        }
+
+        const months: Record<string, number> = {
+            jan: 0, january: 0,
+            feb: 1, february: 1,
+            mar: 2, march: 2,
+            apr: 3, april: 3,
+            may: 4,
+            jun: 5, june: 5,
+            jul: 6, july: 6,
+            aug: 7, august: 7,
+            sep: 8, sept: 8, september: 8,
+            oct: 9, october: 9,
+            nov: 10, november: 10,
+            dec: 11, december: 11
+        };
+
+        const dMonY = s.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b/);
+        if (dMonY) {
+            const dd = Number(dMonY[1]);
+            const mKey = dMonY[2].toLowerCase();
+            const mm = months[mKey];
+            const yy = Number(dMonY[3]);
+            if (typeof mm === 'number') {
+                const dt = new Date(yy, mm, dd, 23, 59, 59, 999);
+                if (!Number.isNaN(dt.getTime())) return dt;
+            }
+        }
+
+        return null;
+    }
+
+    private findLastDate(importantDates: string[]): Date | null {
+        const candidates = importantDates
+            .map(d => String(d || '').trim())
+            .filter(d => /(last\s*date|closing|end\s*date|apply\s*last|last\s*day)/i.test(d));
+        for (const s of candidates) {
+            const dt = this.parseDateFlexible(s);
+            if (dt) return dt;
+        }
+        return null;
+    }
+
+    private async ensureRecentJobCache(): Promise<void> {
+        if (this.recentJobCache) return;
+        try {
+            const rows = await this.env.DB.prepare(
+                `SELECT id, title, category, short_info, important_dates, important_links, apply_link, is_active FROM job_details ORDER BY updated_at DESC LIMIT 800`
+            ).all();
+            this.recentJobCache = (rows.results || []) as any[];
+        } catch {
+            this.recentJobCache = [];
+        }
+    }
+
+    private async findExistingJobIdForUpdate(incomingTitle: string): Promise<string | null> {
+        await this.ensureRecentJobCache();
+        const key = this.normalizeExamKey(incomingTitle);
+        if (!key || key.length < 8) return null;
+        const a = this.tokenSet(key);
+        let best: { id: string; score: number } | null = null;
+        for (const r of this.recentJobCache || []) {
+            const existingKey = this.normalizeExamKey(String(r.title || ''));
+            if (!existingKey) continue;
+            const b = this.tokenSet(existingKey);
+            const score = this.jaccard(a, b);
+            if (score >= 0.7 && (!best || score > best.score)) {
+                best = { id: String(r.id || ''), score };
+            }
+        }
+        return best?.id || null;
     }
 
     private getResultTier(result: SearchResult): number {
@@ -447,9 +571,19 @@ export class AutoAgent {
                     const job = await this.analyzeWithGemini(result);
                     if (job) {
                         if (this.isClaritySufficient(job)) {
+                            let datesArr: string[] = [];
+                            try { datesArr = JSON.parse(job.importantDates || '[]'); } catch { datesArr = []; }
+                            const stage = this.inferStageCategory(job.title, job.shortInfo, job.applyLink);
+                            const lastDate = this.findLastDate(datesArr);
+                            const isExpired = (stage === 'Latest Jobs' || stage === 'Admission') && !!lastDate && lastDate.getTime() < Date.now();
+                            if (isExpired) {
+                                skippedReasons.push(`Expired: ${job.title.substring(0, 40)}... lastDate=${lastDate?.toLocaleDateString()}`);
+                                continue;
+                            }
+
                             console.log(`Saving job: ${job.title}`);
-                            await this.saveJobToDb(job);
-                            jobsAdded++;
+                            const created = await this.saveJobToDb(job);
+                            if (created) jobsAdded++;
                         } else {
                             skippedReasons.push(`Unclear: ${job.title.substring(0, 40)}... from ${result.link}`);
                         }
@@ -595,7 +729,7 @@ export class AutoAgent {
             RULES:
             1. **DO NOT GUESS**: If exact dates/fees are missing, use "Check Notification" / "See Notification" (do not invent values).
             2. **DO NOT FAIL**: Mispelled words or partial data is OKAY. Return the best possible JSON.
-            3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, PSU, Admission, Exam, Other].
+            3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, PSU, Admission, Exam, Results, Admit Card, Answer Key, Syllabus, Other].
             
             Return ONLY a valid JSON object with this schema:
             {
@@ -777,9 +911,105 @@ export class AutoAgent {
         }
     }
 
-    private async saveJobToDb(job: ParsedJob) {
-        const dateStr = job.importantDates;
+    private async saveJobToDb(job: ParsedJob): Promise<boolean> {
+        const safeJsonArray = (s: string): any[] => {
+            try {
+                const v = JSON.parse(String(s || '[]'));
+                return Array.isArray(v) ? v : [];
+            } catch {
+                return [];
+            }
+        };
+        const mergeStringArrays = (a: any[], b: any[], limit = 14): string[] => {
+            const out = Array.from(new Set([...a, ...b].map(x => String(x || '').trim()).filter(Boolean)));
+            return out.slice(0, limit);
+        };
+        const mergeLinks = (a: any[], b: any[], stageLabel: string): Array<{ label: string; url: string }> => {
+            const normalizeUrl = (u: any) => String(u || '').replace(/`/g, '').trim();
+            const out: Array<{ label: string; url: string }> = [];
+            const seen = new Set<string>();
+            const push = (l: any) => {
+                const url = normalizeUrl(l?.url);
+                if (!url) return;
+                if (seen.has(url)) return;
+                const rawLabel = String(l?.label || '').trim();
+                const label = rawLabel || stageLabel || 'Official Link';
+                out.push({ label, url });
+                seen.add(url);
+            };
+            for (const l of a) push(l);
+            for (const l of b) push(l);
+            return out.slice(0, 10);
+        };
 
+        const incomingDates = safeJsonArray(job.importantDates);
+        const incomingLinks = safeJsonArray(job.importantLinks);
+        const stage = this.inferStageCategory(job.title, job.shortInfo, job.applyLink);
+        const stageLabel = stage === 'Latest Jobs' ? 'Official Link' : stage;
+
+        const existingId = await this.findExistingJobIdForUpdate(job.title);
+        if (existingId) {
+            const existing = await this.env.DB.prepare('SELECT * FROM job_details WHERE id = ?').bind(existingId).first() as any;
+            if (existing) {
+                const existingDates = safeJsonArray(existing.important_dates);
+                const existingLinks = safeJsonArray(existing.important_links);
+
+                const mergedDates = mergeStringArrays(existingDates, incomingDates, 16);
+                const mergedLinks = mergeLinks(existingLinks, incomingLinks, stageLabel);
+
+                const existingShort = String(existing.short_info || '');
+                const incomingShort = String(job.shortInfo || '');
+                let mergedShort = existingShort;
+                if (!mergedShort) mergedShort = incomingShort;
+                else if (incomingShort && incomingShort.length > mergedShort.length + 40) mergedShort = incomingShort;
+                if (stage !== 'Latest Jobs' && !mergedShort.toLowerCase().includes(stage.toLowerCase())) {
+                    mergedShort = `${mergedShort}\nUpdate: ${stage} available.`;
+                }
+
+                const existingCategory = String(existing.category || 'Latest Jobs');
+                const category = stage !== 'Latest Jobs' ? stage : existingCategory;
+
+                const existingApply = String(existing.apply_link || '');
+                const applyLink = existingApply || job.applyLink;
+
+                const existingFee = String(existing.application_fee || '[]');
+                const existingAge = String(existing.age_limit || '[]');
+                const existingVac = String(existing.vacancy_details || '[]');
+                const mergedFee = safeJsonArray(existingFee).length ? existingFee : job.applicationFee;
+                const mergedAge = safeJsonArray(existingAge).length ? existingAge : job.ageLimit;
+                const mergedVac = safeJsonArray(existingVac).length ? existingVac : job.vacancyDetails;
+
+                let host = '';
+                try { host = applyLink ? new URL(applyLink).hostname : ''; } catch {}
+                await this.env.DB.prepare(`
+                    UPDATE job_details SET
+                        category = ?, short_info = ?, important_dates = ?, application_fee = ?, age_limit = ?,
+                        vacancy_details = ?, important_links = ?, apply_link = ?, source_url = ?, source_domain = ?,
+                        created_by = ?, quality_score = ?, updated_at = datetime('now')
+                    WHERE id = ?
+                `).bind(
+                    category,
+                    mergedShort,
+                    JSON.stringify(mergedDates),
+                    mergedFee,
+                    mergedAge,
+                    mergedVac,
+                    JSON.stringify(mergedLinks),
+                    applyLink,
+                    job.applyLink || applyLink,
+                    host,
+                    'agent',
+                    100,
+                    existingId
+                ).run();
+
+                await this.ensureRecentJobCache();
+                this.recentJobCache = (this.recentJobCache || []).map(r => String(r.id) === String(existingId) ? { ...r, title: String(existing.title || job.title), category, short_info: mergedShort, important_dates: JSON.stringify(mergedDates), important_links: JSON.stringify(mergedLinks), apply_link: applyLink } : r);
+                return false;
+            }
+        }
+
+        const dateStr = job.importantDates;
         const existingPost = await this.env.DB.prepare('SELECT id FROM job_posts WHERE apply_link = ?')
             .bind(job.applyLink)
             .first();
@@ -794,8 +1024,8 @@ export class AutoAgent {
 
         await this.env.DB.prepare(`
              INSERT INTO job_details (
-                id, title, category, post_date, short_info, 
-                important_dates, application_fee, age_limit, 
+                id, title, category, post_date, short_info,
+                important_dates, application_fee, age_limit,
                 vacancy_details, important_links, apply_link, is_active
              )
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
@@ -805,11 +1035,11 @@ export class AutoAgent {
             job.category,
             new Date().toLocaleDateString(),
             job.shortInfo,
-            job.importantDates,   // Now stored as proper JSON string
-            job.applicationFee,   // New
-            job.ageLimit,         // New
-            job.vacancyDetails,   // New
-            job.importantLinks,   // New
+            job.importantDates,
+            job.applicationFee,
+            job.ageLimit,
+            job.vacancyDetails,
+            job.importantLinks,
             job.applyLink
         ).run();
 
@@ -825,5 +1055,9 @@ export class AutoAgent {
                 .bind('agent', 100, id)
                 .run();
         } catch {}
+
+        await this.ensureRecentJobCache();
+        this.recentJobCache = [{ id, title: job.title, category: job.category, short_info: job.shortInfo, important_dates: job.importantDates, important_links: job.importantLinks, apply_link: job.applyLink }, ...(this.recentJobCache || [])].slice(0, 800);
+        return true;
     }
 }
