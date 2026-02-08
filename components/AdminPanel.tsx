@@ -1202,6 +1202,18 @@ ${detailsCode}
                                                         >
                                                             <Edit size={14} /> Edit
                                                         </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const ok = window.confirm(`Delete this job?\n\n${j.title}\n\nID: ${j.id}`);
+                                                                if (!ok) return;
+                                                                handleDeleteFromDb(j.id);
+                                                            }}
+                                                            disabled={isLoading}
+                                                            className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
+                                                        >
+                                                            <Trash2 size={14} /> Delete
+                                                        </button>
                                                         {Number(j.is_active ?? 1) === 0 ? (
                                                             <>
                                                                 <button
