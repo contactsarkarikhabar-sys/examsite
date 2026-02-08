@@ -49,7 +49,8 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedJobId, setSelectedJobId] = useState('');
     const [searchFilter, setSearchFilter] = useState('');
-    const [pendingJobs, setPendingJobs] = useState<Array<{ id: string; title: string; post_date?: string }>>([]);
+    const [pendingJobs, setPendingJobs] = useState<Array<{ id: string; title: string; post_date?: string; is_active?: number; created_by?: string; source_domain?: string; updated_at?: string }>>([]);
+    const [pendingView, setPendingView] = useState<'pending' | 'active' | 'all'>('pending');
 
     // Get job list from constants
     const jobList = Object.keys(JOB_DETAILS_DB).map(id => ({ id, title: JOB_DETAILS_DB[id].title }));
@@ -70,7 +71,7 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         if (isAuthenticated && isOpen && activeTab === 'pending') {
             loadPending();
         }
-    }, [isAuthenticated, isOpen, activeTab]);
+    }, [isAuthenticated, isOpen, activeTab, pendingView]);
 
     const loadStats = async () => {
         const data: any = await jobService.getSubscribersCount(password);
@@ -80,8 +81,42 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     };
 
     const loadPending = async () => {
-        const rows = await jobService.getPendingJobs(password);
-        setPendingJobs(rows);
+        const result = await jobService.getAdminJobs(password, pendingView);
+        if (result.success) {
+            setPendingJobs(result.jobs);
+        } else {
+            setPendingJobs([]);
+            setMessage({ type: 'error', text: result.message || 'Failed to load jobs' });
+        }
+    };
+
+    const handleLoadDbJobForEdit = async (jobId: string) => {
+        setIsLoading(true);
+        setMessage(null);
+        const result = await jobService.getAdminJobById(jobId, password);
+        setIsLoading(false);
+        if (result.success && result.job) {
+            const job = result.job as any;
+            setFullJobForm({
+                id: String(job.id || ''),
+                title: String(job.title || ''),
+                category: String(job.category || 'Latest Jobs'),
+                postDate: String(job.postDate || ''),
+                shortInfo: String(job.shortInfo || ''),
+                importantDates: Array.isArray(job.importantDates) && job.importantDates.length ? job.importantDates : [''],
+                applicationFee: Array.isArray(job.applicationFee) && job.applicationFee.length ? job.applicationFee : [''],
+                ageLimit: Array.isArray(job.ageLimit) && job.ageLimit.length ? job.ageLimit : [''],
+                vacancyDetails: Array.isArray(job.vacancyDetails) && job.vacancyDetails.length ? job.vacancyDetails : [{ postName: '', totalPost: '', eligibility: '' }],
+                importantLinks: Array.isArray(job.importantLinks) && job.importantLinks.length ? job.importantLinks : [{ label: '', url: '' }]
+            });
+            setSelectedJobId(String(job.id || jobId));
+            setIsEditMode(true);
+            setGeneratedCode('');
+            setActiveTab('full');
+            setMessage({ type: 'success', text: `✅ Loaded from DB: ${job.title || jobId}` });
+        } else {
+            setMessage({ type: 'error', text: result.message || 'Failed to load job' });
+        }
     };
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -936,6 +971,29 @@ ${detailsCode}
                                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                                     <div className="flex items-center justify-between gap-3 mb-4">
                                         <h4 className="font-bold text-gray-800">Pending approvals</h4>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPendingView('pending')}
+                                                className={`text-sm font-bold py-2 px-3 rounded-lg border ${pendingView === 'pending' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'}`}
+                                            >
+                                                Pending
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPendingView('active')}
+                                                className={`text-sm font-bold py-2 px-3 rounded-lg border ${pendingView === 'active' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'}`}
+                                            >
+                                                Active
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPendingView('all')}
+                                                className={`text-sm font-bold py-2 px-3 rounded-lg border ${pendingView === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'}`}
+                                            >
+                                                All
+                                            </button>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={handleCleanupJunk}
@@ -948,32 +1006,65 @@ ${detailsCode}
                                     </div>
 
                                     {pendingJobs.length === 0 ? (
-                                        <div className="text-sm text-gray-600">No pending jobs.</div>
+                                        <div className="text-sm text-gray-600">
+                                            {pendingView === 'pending' ? 'No pending jobs.' : 'No jobs.'}
+                                        </div>
                                     ) : (
                                         <div className="space-y-2">
                                             {pendingJobs.slice(0, 50).map(j => (
                                                 <div key={j.id} className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg p-3">
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="text-sm font-bold text-gray-800 truncate">{j.title}</div>
-                                                        <div className="text-xs text-gray-500 truncate">{j.id}{j.post_date ? ` • ${j.post_date}` : ''}</div>
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="text-sm font-bold text-gray-800 truncate">{j.title}</div>
+                                                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${Number(j.is_active ?? 1) === 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                                                                {Number(j.is_active ?? 1) === 0 ? 'Pending' : 'Active'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 truncate">
+                                                            {j.id}
+                                                            {j.post_date ? ` • ${j.post_date}` : ''}
+                                                            {j.source_domain ? ` • ${j.source_domain}` : ''}
+                                                            {j.created_by ? ` • ${j.created_by}` : ''}
+                                                        </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleReject(j.id)}
+                                                            onClick={() => handleLoadDbJobForEdit(j.id)}
                                                             disabled={isLoading}
-                                                            className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 font-bold py-2 px-3 rounded-lg text-sm"
+                                                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
                                                         >
-                                                            Reject
+                                                            <Edit size={14} /> Edit
                                                         </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleApprove(j.id)}
-                                                            disabled={isLoading}
-                                                            className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-2 px-3 rounded-lg text-sm"
-                                                        >
-                                                            Approve
-                                                        </button>
+                                                        {Number(j.is_active ?? 1) === 0 ? (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleReject(j.id)}
+                                                                    disabled={isLoading}
+                                                                    className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 font-bold py-2 px-3 rounded-lg text-sm"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleApprove(j.id)}
+                                                                    disabled={isLoading}
+                                                                    className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-2 px-3 rounded-lg text-sm"
+                                                                >
+                                                                    Approve
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleReject(j.id)}
+                                                                disabled={isLoading}
+                                                                className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 font-bold py-2 px-3 rounded-lg text-sm"
+                                                            >
+                                                                Deactivate
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}

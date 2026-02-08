@@ -1040,6 +1040,86 @@ export default {
             return jsonResponse({ success: true, pending: rows.results || [] }, 200, origin);
         }
 
+        if (path === '/api/admin/jobs' && request.method === 'GET') {
+            const origin = request.headers.get('Origin');
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+            const url = new URL(request.url);
+            const status = (url.searchParams.get('status') || 'all').toLowerCase();
+            let whereClause = '';
+            if (status === 'pending') whereClause = 'WHERE is_active = 0';
+            else if (status === 'active') whereClause = 'WHERE is_active = 1';
+            else if (status === 'inactive') whereClause = 'WHERE is_active != 1';
+            const rows = await env.DB.prepare(
+                `SELECT id, title, post_date, is_active, created_by, source_domain, updated_at
+                 FROM job_details
+                 ${whereClause}
+                 ORDER BY updated_at DESC
+                 LIMIT 200`
+            ).all();
+            return jsonResponse({ success: true, jobs: rows.results || [] }, 200, origin);
+        }
+
+        if (path.startsWith('/api/admin/jobs/') && request.method === 'GET') {
+            const origin = request.headers.get('Origin');
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+            const jobId = path.replace('/api/admin/jobs/', '');
+            const job = await env.DB.prepare('SELECT * FROM job_details WHERE id = ?')
+                .bind(jobId)
+                .first();
+
+            if (!job) {
+                return errorResponse('Job not found', 404, origin);
+            }
+
+            const importantDates = JSON.parse((job as any).important_dates || '[]');
+            const applicationFee = JSON.parse((job as any).application_fee || '[]');
+            const ageLimit = JSON.parse((job as any).age_limit || '[]');
+            const vacancyDetailsRaw = JSON.parse((job as any).vacancy_details || '[]');
+            const vacancyDetails = Array.isArray(vacancyDetailsRaw)
+                ? vacancyDetailsRaw.map((v: any) => ({
+                    postName: String(v?.postName || ''),
+                    totalPost: String(v?.totalPost || ''),
+                    eligibility: String(v?.eligibility || '')
+                }))
+                : [];
+            const importantLinks = (JSON.parse((job as any).important_links || '[]') as any[]).map((l: any) => ({
+                label: String(l?.label || ''),
+                url: String(l?.url || '').replace(/`/g, '').trim()
+            }));
+            const applyLink = String((job as any).apply_link || '');
+            const title = deriveReadableTitle({
+                title: String((job as any).title || ''),
+                shortInfo: String((job as any).short_info || ''),
+                importantDates,
+                importantLinks,
+                applyLink
+            });
+
+            return jsonResponse({
+                success: true,
+                job: {
+                    id: String((job as any).id || ''),
+                    title,
+                    category: String((job as any).category || ''),
+                    postDate: String((job as any).post_date || ''),
+                    shortInfo: String((job as any).short_info || ''),
+                    importantDates,
+                    applicationFee,
+                    ageLimit,
+                    vacancyDetails,
+                    importantLinks,
+                    applyLink,
+                    isActive: Number((job as any).is_active ?? 1)
+                }
+            }, 200, origin);
+        }
+
         if (path.startsWith('/api/admin/approve/') && request.method === 'POST') {
             const origin = request.headers.get('Origin');
             const authHeader = request.headers.get('Authorization');

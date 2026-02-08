@@ -324,6 +324,44 @@ export const jobService = {
     return data.jobs || [];
   },
 
+  getAdminJobs: async (
+    adminPassword: string,
+    status: 'pending' | 'active' | 'inactive' | 'all' = 'all'
+  ): Promise<{ success: boolean; jobs: Array<{ id: string; title: string; post_date?: string; is_active?: number; created_by?: string; source_domain?: string; updated_at?: string }>; message?: string }> => {
+    const workerUrl = getWorkerBaseUrl();
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs?status=${encodeURIComponent(status)}` : `/api/admin/jobs?status=${encodeURIComponent(status)}`;
+    const response = await fetch(apiUrl, {
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {}
+    if (!response.ok || data?.success === false) {
+      return { success: false, jobs: [], message: data?.error || `Request failed (${response.status})` };
+    }
+    return { success: true, jobs: Array.isArray(data?.jobs) ? data.jobs : [], message: undefined };
+  },
+
+  getAdminJobById: async (
+    jobId: string,
+    adminPassword: string
+  ): Promise<{ success: boolean; job?: any; message?: string }> => {
+    const workerUrl = getWorkerBaseUrl();
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs/${encodeURIComponent(jobId)}` : `/api/admin/jobs/${encodeURIComponent(jobId)}`;
+    const response = await fetch(apiUrl, {
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {}
+    if (!response.ok || data?.success === false) {
+      return { success: false, message: data?.error || `Request failed (${response.status})` };
+    }
+    return { success: true, job: data?.job, message: undefined };
+  },
+
   saveJob: async (
     jobData: any,
     adminPassword: string
@@ -353,13 +391,9 @@ export const jobService = {
   },
 
   getPendingJobs: async (adminPassword: string): Promise<Array<{ id: string; title: string; post_date?: string }>> => {
-    const workerUrl = getWorkerBaseUrl();
-    const apiUrl = workerUrl ? `${workerUrl}/api/admin/pending` : '/api/admin/pending';
-    const response = await fetch(apiUrl, {
-      headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    const data = await response.json() as any;
-    return data.pending || [];
+    const result = await jobService.getAdminJobs(adminPassword, 'pending');
+    if (!result.success) return [];
+    return result.jobs.map(j => ({ id: String(j.id || ''), title: String(j.title || ''), post_date: j.post_date ? String(j.post_date) : undefined }));
   },
 
   approveJob: async (jobId: string, adminPassword: string): Promise<{ success: boolean; message?: string }> => {
