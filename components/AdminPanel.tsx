@@ -1043,9 +1043,18 @@ ${detailsCode}
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <div className="text-sm font-bold text-gray-800 truncate">{j.title}</div>
-                                                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${Number(j.is_active ?? 1) === 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                                                                {Number(j.is_active ?? 1) === 0 ? 'Pending' : 'Active'}
-                                                            </span>
+                                                            {(() => {
+                                                                const s = Number(j.is_active ?? 1);
+                                                                const label = s === 0 ? 'Pending' : (s === 1 ? 'Active' : 'Rejected');
+                                                                const cls = s === 0
+                                                                    ? 'bg-yellow-100 text-yellow-800'
+                                                                    : (s === 1 ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800');
+                                                                return (
+                                                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${cls}`}>
+                                                                        {label}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </div>
                                                         <div className="text-xs text-gray-500 truncate">
                                                             {j.id}

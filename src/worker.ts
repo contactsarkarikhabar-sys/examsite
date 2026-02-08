@@ -761,7 +761,7 @@ async function handleDeleteJob(request: Request, env: Env, jobId: string): Promi
 
     try {
         // Soft delete
-        await env.DB.prepare('UPDATE job_details SET is_active = 0, updated_at = datetime("now") WHERE id = ?')
+        await env.DB.prepare('UPDATE job_details SET is_active = -1, updated_at = datetime("now") WHERE id = ?')
             .bind(jobId)
             .run();
 
@@ -840,7 +840,7 @@ export default {
             try {
                 await env.DB.prepare(`
                     UPDATE job_details
-                    SET is_active = 0, updated_at = datetime('now')
+                    SET is_active = -1, updated_at = datetime('now')
                     WHERE is_active = 1 AND (
                         title LIKE '%http%' OR
                         title LIKE '%www.%' OR
@@ -1101,7 +1101,7 @@ export default {
                 if (flags.is_active) {
                     if (status === 'pending') whereClause = 'WHERE is_active = 0';
                     else if (status === 'active') whereClause = 'WHERE is_active = 1';
-                    else if (status === 'inactive') whereClause = 'WHERE is_active != 1';
+                    else if (status === 'inactive') whereClause = 'WHERE is_active = -1';
                 }
                 const rows = await env.DB.prepare(
                     `SELECT ${sql.select} FROM job_details ${whereClause} ORDER BY ${sql.orderBy} DESC LIMIT 200`
@@ -1189,7 +1189,7 @@ export default {
                 return errorResponse('Unauthorized', 401, origin);
             }
             const jobId = path.replace('/api/admin/reject/', '');
-            await env.DB.prepare(`UPDATE job_details SET is_active = 0, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
+            await env.DB.prepare(`UPDATE job_details SET is_active = -1, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
             return jsonResponse({ success: true, message: 'Rejected' }, 200, origin);
         }
 
