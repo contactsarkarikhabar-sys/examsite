@@ -6,6 +6,7 @@
 import { EmailService } from './email-service';
 import { emailTemplates } from './email-templates';
 import { deriveReadableTitle, isDisplayableJob } from '../shared/jobTitle';
+import { validateJob } from './agent-policy';
 
 // Types
 interface Env {
@@ -455,6 +456,7 @@ interface JobDetailRequest {
     ageLimit?: string[];
     vacancyDetails?: { postName: string; totalPost: string; eligibility: string }[];
     importantLinks?: { label: string; url: string }[];
+    applyLink?: string;
 }
 
 // Handler: Get all jobs (public)
@@ -501,10 +503,11 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
                 importantLinks,
                 applyLink
             };
-            if (!isDisplayableJob(rawJob)) {
+            const verdict = validateJob(rawJob);
+            if (!verdict.ok) {
                 return null;
             }
-            const title = deriveReadableTitle(rawJob);
+            const title = verdict.normalizedTitle || deriveReadableTitle(rawJob);
             return {
                 id: String(row.id || ''),
                 title,
@@ -532,7 +535,7 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
 async function handleGetJob(request: Request, env: Env, jobId: string): Promise<Response> {
     const origin = request.headers.get('Origin');
     try {
-        const job = await env.DB.prepare('SELECT * FROM job_details WHERE id = ?')
+        const job = await env.DB.prepare('SELECT * FROM job_details WHERE id = ? AND is_active = 1')
             .bind(jobId)
             .first();
 
@@ -611,6 +614,24 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
         const category = sanitizeString(body.category || 'Latest Jobs', 50);
         const postDate = sanitizeString(body.postDate || '', 100);
         const shortInfo = sanitizeString(body.shortInfo || '', 5000);
+        const importantDates = body.importantDates || [];
+        const applicationFee = body.applicationFee || [];
+        const ageLimit = body.ageLimit || [];
+        const vacancyDetails = body.vacancyDetails || [];
+        const importantLinks = body.importantLinks || [];
+        const applyLink = sanitizeString(body.applyLink || importantLinks?.[0]?.url || '', 2000);
+
+        const verdict = validateJob({
+            title,
+            shortInfo,
+            importantDates,
+            importantLinks,
+            applyLink
+        });
+        if (!verdict.ok) {
+            return errorResponse(verdict.reason || 'Invalid job', 400, origin);
+        }
+        const normalizedTitle = sanitizeString(verdict.normalizedTitle || title, 200);
 
         // Check if exists
         const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
@@ -623,33 +644,51 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
                 UPDATE job_details SET
                     title = ?, category = ?, post_date = ?, short_info = ?,
                     important_dates = ?, application_fee = ?, age_limit = ?,
-                    vacancy_details = ?, important_links = ?, updated_at = datetime('now')
+                    vacancy_details = ?, important_links = ?, apply_link = ?, updated_at = datetime('now')
                 WHERE id = ?
             `).bind(
-                title, category, postDate, shortInfo,
-                JSON.stringify(body.importantDates || []),
-                JSON.stringify(body.applicationFee || []),
-                JSON.stringify(body.ageLimit || []),
-                JSON.stringify(body.vacancyDetails || []),
-                JSON.stringify(body.importantLinks || []),
+                normalizedTitle, category, postDate, shortInfo,
+                JSON.stringify(importantDates),
+                JSON.stringify(applicationFee),
+                JSON.stringify(ageLimit),
+                JSON.stringify(vacancyDetails),
+                JSON.stringify(importantLinks),
+                applyLink,
                 id
             ).run();
+
+            try {
+                let host = '';
+                try { host = applyLink ? new URL(applyLink).hostname : ''; } catch {}
+                await env.DB.prepare(`UPDATE job_details SET created_by = ?, quality_score = ?, source_url = ?, source_domain = ?, updated_at = datetime('now') WHERE id = ?`)
+                    .bind('manual', 100, applyLink, host, id)
+                    .run();
+            } catch {}
 
             return jsonResponse({ success: true, message: 'Job updated successfully', id }, 200, origin);
         } else {
             // Insert
             await env.DB.prepare(`
                 INSERT INTO job_details (id, title, category, post_date, short_info,
-                    important_dates, application_fee, age_limit, vacancy_details, important_links)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    important_dates, application_fee, age_limit, vacancy_details, important_links, apply_link)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).bind(
-                id, title, category, postDate, shortInfo,
-                JSON.stringify(body.importantDates || []),
-                JSON.stringify(body.applicationFee || []),
-                JSON.stringify(body.ageLimit || []),
-                JSON.stringify(body.vacancyDetails || []),
-                JSON.stringify(body.importantLinks || [])
+                id, normalizedTitle, category, postDate, shortInfo,
+                JSON.stringify(importantDates),
+                JSON.stringify(applicationFee),
+                JSON.stringify(ageLimit),
+                JSON.stringify(vacancyDetails),
+                JSON.stringify(importantLinks),
+                applyLink
             ).run();
+
+            try {
+                let host = '';
+                try { host = applyLink ? new URL(applyLink).hostname : ''; } catch {}
+                await env.DB.prepare(`UPDATE job_details SET created_by = ?, quality_score = ?, source_url = ?, source_domain = ?, updated_at = datetime('now') WHERE id = ?`)
+                    .bind('manual', 100, applyLink, host, id)
+                    .run();
+            } catch {}
 
             return jsonResponse({ success: true, message: 'Job created successfully', id }, 201, origin);
         }
@@ -951,6 +990,8 @@ export default {
                 const hasApplyLink = (info.results || []).some((r: any) => r.name === 'apply_link');
                 const hasSourceUrl = (info.results || []).some((r: any) => r.name === 'source_url');
                 const hasSourceDomain = (info.results || []).some((r: any) => r.name === 'source_domain');
+                const hasCreatedBy = (info.results || []).some((r: any) => r.name === 'created_by');
+                const hasQualityScore = (info.results || []).some((r: any) => r.name === 'quality_score');
                 let applied = false;
                 if (!hasApplyLink) {
                     await env.DB.prepare('ALTER TABLE job_details ADD COLUMN apply_link TEXT').run();
@@ -962,6 +1003,14 @@ export default {
                 }
                 if (!hasSourceDomain) {
                     await env.DB.prepare('ALTER TABLE job_details ADD COLUMN source_domain TEXT').run();
+                    applied = true;
+                }
+                if (!hasCreatedBy) {
+                    await env.DB.prepare('ALTER TABLE job_details ADD COLUMN created_by TEXT').run();
+                    applied = true;
+                }
+                if (!hasQualityScore) {
+                    await env.DB.prepare('ALTER TABLE job_details ADD COLUMN quality_score INTEGER').run();
                     applied = true;
                 }
                 return jsonResponse({ success: true, applied }, 200, origin);
@@ -990,6 +1039,17 @@ export default {
             const jobId = path.replace('/api/admin/approve/', '');
             await env.DB.prepare(`UPDATE job_details SET is_active = 1, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
             return jsonResponse({ success: true, message: 'Approved' }, 200, origin);
+        }
+
+        if (path.startsWith('/api/admin/reject/') && request.method === 'POST') {
+            const origin = request.headers.get('Origin');
+            const authHeader = request.headers.get('Authorization');
+            if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
+                return errorResponse('Unauthorized', 401, origin);
+            }
+            const jobId = path.replace('/api/admin/reject/', '');
+            await env.DB.prepare(`UPDATE job_details SET is_active = 0, updated_at = datetime('now') WHERE id = ?`).bind(jobId).run();
+            return jsonResponse({ success: true, message: 'Rejected' }, 200, origin);
         }
 
         // Job Details CRUD Routes

@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS job_details (
     apply_link TEXT,
     source_url TEXT,
     source_domain TEXT,
+    created_by TEXT,
+    quality_score INTEGER,
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))

@@ -389,6 +389,19 @@ ${detailsCode}
         }
     };
 
+    const handleReject = async (jobId: string) => {
+        setIsLoading(true);
+        setMessage(null);
+        const result = await jobService.rejectJob(jobId, password);
+        setIsLoading(false);
+        if (result.success) {
+            setMessage({ type: 'success', text: '✅ Rejected' });
+            loadPending();
+        } else {
+            setMessage({ type: 'error', text: result.message || 'Reject failed' });
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -935,14 +948,24 @@ ${detailsCode}
                                                         <div className="text-sm font-bold text-gray-800 truncate">{j.title}</div>
                                                         <div className="text-xs text-gray-500 truncate">{j.id}{j.post_date ? ` • ${j.post_date}` : ''}</div>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleApprove(j.id)}
-                                                        disabled={isLoading}
-                                                        className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-2 px-3 rounded-lg text-sm"
-                                                    >
-                                                        Approve
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleReject(j.id)}
+                                                            disabled={isLoading}
+                                                            className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 font-bold py-2 px-3 rounded-lg text-sm"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleApprove(j.id)}
+                                                            disabled={isLoading}
+                                                            className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-bold py-2 px-3 rounded-lg text-sm"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>

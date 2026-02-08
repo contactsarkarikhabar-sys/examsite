@@ -500,5 +500,11 @@ export class AutoAgent {
                 .bind(job.applyLink, host, id)
                 .run();
         } catch {}
+
+        try {
+            await this.env.DB.prepare(`UPDATE job_details SET created_by = ?, quality_score = ?, updated_at = datetime('now') WHERE id = ?`)
+                .bind('agent', 100, id)
+                .run();
+        } catch {}
     }
 }

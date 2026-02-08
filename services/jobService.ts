@@ -364,6 +364,16 @@ export const jobService = {
     return await response.json() as any;
   },
 
+  rejectJob: async (jobId: string, adminPassword: string): Promise<{ success: boolean; message?: string }> => {
+    const workerUrl = getWorkerBaseUrl();
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/reject/${encodeURIComponent(jobId)}` : `/api/admin/reject/${encodeURIComponent(jobId)}`;
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    return await response.json() as any;
+  },
+
   cleanupJunkJobs: async (adminPassword: string): Promise<{ success: boolean; message?: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/cleanup-junk` : '/api/admin/cleanup-junk';
