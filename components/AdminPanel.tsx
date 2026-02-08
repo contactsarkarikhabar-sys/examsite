@@ -94,7 +94,6 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         if (result.success) {
             setPendingJobs(result.jobs);
         } else {
-            setPendingJobs([]);
             setMessage({ type: 'error', text: result.message || 'Failed to load jobs' });
         }
     };

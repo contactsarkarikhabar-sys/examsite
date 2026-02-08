@@ -75,6 +75,66 @@ const getInitialSections = (): SectionData[] => {
   return JSON.parse(JSON.stringify(MOCK_SECTIONS));
 };
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const safeJson = async (response: Response): Promise<any | null> => {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+};
+
+const safeTextHead = async (response: Response, maxLen = 200): Promise<string> => {
+  try {
+    const txt = await response.text();
+    const compact = txt.replace(/\s+/g, ' ').trim();
+    return compact.length > maxLen ? compact.slice(0, maxLen) : compact;
+  } catch {
+    return '';
+  }
+};
+
+const shouldRetry = (status: number) => status === 502 || status === 503 || status === 504;
+
+const fetchWithRetry = async (
+  url: string,
+  init: RequestInit,
+  retries = 2
+): Promise<Response> => {
+  const method = String(init?.method || 'GET').toUpperCase();
+  const retryableMethod = method === 'GET' || method === 'DELETE';
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    try {
+      const response = await fetch(url, init);
+      if (retryableMethod && attempt <= retries + 1 && shouldRetry(response.status)) {
+        await sleep(350 * attempt);
+        continue;
+      }
+      return response;
+    } catch (e) {
+      if (!retryableMethod || attempt > retries + 1) throw e;
+      await sleep(350 * attempt);
+    }
+  }
+};
+
+const formatRay = (response: Response) => {
+  const ray = response.headers.get('cf-ray') || response.headers.get('CF-RAY');
+  return ray ? ` (Ray: ${ray})` : '';
+};
+
+const toRequestFailedMessage = (response: Response) => {
+  const status = response.status;
+  if (status === 503) return `Server temporarily unavailable (503). Please try again.${formatRay(response)}`;
+  if (status === 504) return `Server timeout (504). Please try again.${formatRay(response)}`;
+  if (status === 502) return `Bad gateway (502). Please try again.${formatRay(response)}`;
+  const statusText = response.statusText;
+  return `Request failed (${status}${statusText ? ` ${statusText}` : ''})${formatRay(response)}`;
+};
+
 // --- CACHING LOGIC ---
 let cachedSections: SectionData[] | null = null;
 let lastFetchTime = 0;
@@ -296,27 +356,36 @@ export const jobService = {
     adminPassword: string
   ): Promise<{ success: boolean; message: string; notificationsSent?: number }> => {
     const workerUrl = getWorkerBaseUrl();
-    const response = await fetch(`${workerUrl}/api/admin/post-job`, {
+    const response = await fetchWithRetry(`${workerUrl}/api/admin/post-job`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${adminPassword}`,
       },
       body: JSON.stringify(jobData),
-    });
-    return await response.json() as { success: boolean; message: string; notificationsSent?: number };
+    }, 0);
+    const data: any = await safeJson(response);
+    if (!response.ok || data?.success === false) {
+      const msg = data?.message || data?.error;
+      if (msg) return { success: false, message: String(msg) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
+    }
+    return data as { success: boolean; message: string; notificationsSent?: number };
   },
 
   getSubscribersCount: async (adminPassword: string) => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/subscribers` : '/api/admin/subscribers';
     try {
-      const response = await fetch(apiUrl, {
+      const response = await fetchWithRetry(apiUrl, {
         headers: { 'Authorization': `Bearer ${adminPassword}` },
-      });
-      const data = await response.json() as any;
+      }, 2);
+      const data = await safeJson(response) as any;
       if (!response.ok || data?.success === false) {
-        return { total: -1, verified: 0, recentSubscribers: [], error: data?.error || 'Unauthorized' };
+        if (data?.error) return { total: -1, verified: 0, recentSubscribers: [], error: String(data.error) };
+        const head = await safeTextHead(response);
+        return { total: -1, verified: 0, recentSubscribers: [], error: head || toRequestFailedMessage(response) };
       }
       return {
         total: data.totalSubscribers || 0,
@@ -343,16 +412,15 @@ export const jobService = {
   ): Promise<{ success: boolean; jobs: Array<{ id: string; title: string; post_date?: string; is_active?: number; created_by?: string; source_domain?: string; updated_at?: string }>; message?: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs?status=${encodeURIComponent(status)}` : `/api/admin/jobs?status=${encodeURIComponent(status)}`;
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       cache: 'no-store',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    let data: any = null;
-    try {
-      data = await response.json();
-    } catch {}
+    }, 2);
+    const data: any = await safeJson(response);
     if (!response.ok || data?.success === false) {
-      return { success: false, jobs: [], message: data?.error || `Request failed (${response.status})` };
+      if (data?.error) return { success: false, jobs: [], message: String(data.error) };
+      const head = await safeTextHead(response);
+      return { success: false, jobs: [], message: head || toRequestFailedMessage(response) };
     }
     return { success: true, jobs: Array.isArray(data?.jobs) ? data.jobs : [], message: undefined };
   },
@@ -363,16 +431,15 @@ export const jobService = {
   ): Promise<{ success: boolean; job?: any; message?: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs/${encodeURIComponent(jobId)}` : `/api/admin/jobs/${encodeURIComponent(jobId)}`;
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       cache: 'no-store',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    let data: any = null;
-    try {
-      data = await response.json();
-    } catch {}
+    }, 2);
+    const data: any = await safeJson(response);
     if (!response.ok || data?.success === false) {
-      return { success: false, message: data?.error || `Request failed (${response.status})` };
+      if (data?.error) return { success: false, message: String(data.error) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
     }
     return { success: true, job: data?.job, message: undefined };
   },
@@ -383,20 +450,19 @@ export const jobService = {
   ): Promise<{ success: boolean; message: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs` : '/api/admin/jobs';
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${adminPassword}`,
       },
       body: JSON.stringify(jobData),
-    });
-    let data: any = null;
-    try {
-      data = await response.json();
-    } catch {}
+    }, 0);
+    const data: any = await safeJson(response);
     if (!response.ok || data?.success === false) {
-      return { success: false, message: data?.message || data?.error || `Request failed (${response.status})` };
+      if (data?.message || data?.error) return { success: false, message: String(data?.message || data?.error) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
     }
     return { success: true, message: data?.message || 'Saved' };
   },
@@ -407,17 +473,16 @@ export const jobService = {
   ): Promise<{ success: boolean; message: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs/${encodeURIComponent(jobId)}` : `/api/admin/jobs/${encodeURIComponent(jobId)}`;
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       method: 'DELETE',
       cache: 'no-store',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    let data: any = null;
-    try {
-      data = await response.json();
-    } catch {}
+    }, 2);
+    const data: any = await safeJson(response);
     if (!response.ok || data?.success === false) {
-      return { success: false, message: data?.message || data?.error || `Request failed (${response.status})` };
+      if (data?.message || data?.error) return { success: false, message: String(data?.message || data?.error) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
     }
     return { success: true, message: data?.message || 'Deleted' };
   },
@@ -431,46 +496,67 @@ export const jobService = {
   approveJob: async (jobId: string, adminPassword: string): Promise<{ success: boolean; message?: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/approve/${encodeURIComponent(jobId)}` : `/api/admin/approve/${encodeURIComponent(jobId)}`;
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    return await response.json() as any;
+    }, 0);
+    const data: any = await safeJson(response);
+    if (!response.ok || data?.success === false) {
+      const msg = data?.message || data?.error;
+      if (msg) return { success: false, message: String(msg) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
+    }
+    return data as any;
   },
 
   rejectJob: async (jobId: string, adminPassword: string): Promise<{ success: boolean; message?: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/reject/${encodeURIComponent(jobId)}` : `/api/admin/reject/${encodeURIComponent(jobId)}`;
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    return await response.json() as any;
+    }, 0);
+    const data: any = await safeJson(response);
+    if (!response.ok || data?.success === false) {
+      const msg = data?.message || data?.error;
+      if (msg) return { success: false, message: String(msg) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
+    }
+    return data as any;
   },
 
   cleanupJunkJobs: async (adminPassword: string): Promise<{ success: boolean; message?: string }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/cleanup-junk` : '/api/admin/cleanup-junk';
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    return await response.json() as any;
+    }, 0);
+    const data: any = await safeJson(response);
+    if (!response.ok || data?.success === false) {
+      const msg = data?.message || data?.error;
+      if (msg) return { success: false, message: String(msg) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
+    }
+    return data as any;
   },
 
   runAgentNow: async (adminPassword: string): Promise<{ success: boolean; message?: string; jobsAdded?: number; debug?: any }> => {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/trigger-agent` : '/api/admin/trigger-agent';
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    let data: any = null;
-    try {
-      data = await response.json();
-    } catch {}
+    }, 0);
+    const data: any = await safeJson(response);
     if (!response.ok || data?.success === false) {
-      return { success: false, message: data?.error || `Request failed (${response.status})` };
+      const msg = data?.message || data?.error;
+      if (msg) return { success: false, message: String(msg) };
+      const head = await safeTextHead(response);
+      return { success: false, message: head || toRequestFailedMessage(response) };
     }
     return data as any;
   },
