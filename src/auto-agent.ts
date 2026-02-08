@@ -35,6 +35,188 @@ export class AutoAgent {
         this.env = env;
     }
 
+    private stripHtmlToText(html: string): string {
+        return html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, "")
+            .replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, "")
+            .replace(/<[^>]+>/g, "\n")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    private extractCandidateUrlsFromHtml(html: string, baseUrl: string): string[] {
+        const out: string[] = [];
+        const pushUrl = (raw: string) => {
+            const u = (raw || '').trim();
+            if (!u) return;
+            if (/^(mailto:|tel:|javascript:)/i.test(u)) return;
+            if (u.startsWith('#')) return;
+            try {
+                const abs = new URL(u, baseUrl);
+                if (abs.protocol !== 'http:' && abs.protocol !== 'https:') return;
+                const href = abs.toString();
+                if (/\.(png|jpg|jpeg|gif|svg|webp|css|js)(\?|$)/i.test(href)) return;
+                if (/(facebook\.com|instagram\.com|twitter\.com|x\.com|youtube\.com|youtu\.be|t\.me|telegram\.me|whatsapp\.com|wa\.me)/i.test(href)) return;
+                out.push(href);
+            } catch {}
+        };
+
+        const hrefRe = /href\s*=\s*["']([^"']+)["']/gi;
+        for (let m; (m = hrefRe.exec(html));) {
+            pushUrl(m[1]);
+        }
+
+        const urlRe = /\bhttps?:\/\/[^\s"'<>]+/gi;
+        for (let m; (m = urlRe.exec(html));) {
+            pushUrl(m[0]);
+        }
+
+        return Array.from(new Set(out));
+    }
+
+    private rankCandidateUrls(urls: string[], baseUrl: string): string[] {
+        let baseHost = '';
+        try { baseHost = new URL(baseUrl).hostname; } catch {}
+        const scored = urls.map(u => {
+            let score = 0;
+            try {
+                const parsed = new URL(u);
+                if (baseHost && parsed.hostname === baseHost) score += 20;
+                if (isTrustedDomainShared(u)) score += 30;
+            } catch {}
+            if (/\.(pdf)(\?|$)/i.test(u)) score += 60;
+            if (/(notification|advertisement|adv\b|recruitment|corrigendum|notice|press\s*release)/i.test(u)) score += 35;
+            if (/(apply|application|registration|online\s*form|portal)/i.test(u)) score += 20;
+            if (/(login|captcha|share|redirect|downloadmanager)/i.test(u)) score -= 40;
+            if (/(tender|auction|geM|eproc|e\-proc)/i.test(u)) score -= 30;
+            return { u, score };
+        }).sort((a, b) => b.score - a.score);
+        return scored.map(s => s.u);
+    }
+
+    private extractTextFromPdf(buffer: ArrayBuffer): string {
+        try {
+            const bytes = new Uint8Array(buffer);
+            const text = new TextDecoder('latin1', { fatal: false }).decode(bytes);
+            const parts: string[] = [];
+
+            const unescapePdfString = (s: string) => s
+                .replace(/\\n/g, '\n')
+                .replace(/\\r/g, '\r')
+                .replace(/\\t/g, '\t')
+                .replace(/\\\(/g, '(')
+                .replace(/\\\)/g, ')')
+                .replace(/\\\\/g, '\\');
+
+            const tjRe = /\(((?:\\.|[^\\)]){3,})\)\s*Tj/g;
+            for (let m; (m = tjRe.exec(text));) {
+                const v = unescapePdfString(m[1]);
+                if (v) parts.push(v);
+            }
+
+            const tjArrayRe = /\[((?:.|\n|\r)*?)\]\s*TJ/g;
+            for (let m; (m = tjArrayRe.exec(text));) {
+                const inner = m[1] || '';
+                const innerRe = /\(((?:\\.|[^\\)]){3,})\)/g;
+                for (let n; (n = innerRe.exec(inner));) {
+                    const v = unescapePdfString(n[1]);
+                    if (v) parts.push(v);
+                }
+            }
+
+            const joined = parts.join(' ')
+                .replace(/\s+/g, ' ')
+                .replace(/[^\S\r\n]+/g, ' ')
+                .trim();
+            return joined.slice(0, 30000);
+        } catch {
+            return '';
+        }
+    }
+
+    private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response | null> {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            const res = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-IN,en;q=0.9,hi;q=0.8'
+                },
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
+            return res;
+        } catch {
+            return null;
+        }
+    }
+
+    private async buildDeepContext(baseUrl: string, snippet: string): Promise<{ context: string; candidateLinks: string[] }> {
+        const pieces: string[] = [];
+        pieces.push(`Snippet: ${snippet}`);
+
+        const primaryRes = await this.fetchWithTimeout(baseUrl, 12000);
+        if (!primaryRes || !primaryRes.ok) {
+            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl] };
+        }
+
+        const primaryType = (primaryRes.headers.get('content-type') || '').toLowerCase();
+        if (primaryType.includes('application/pdf') || /\.(pdf)(\?|$)/i.test(baseUrl)) {
+            const buf = await primaryRes.arrayBuffer();
+            const pdfText = this.extractTextFromPdf(buf);
+            pieces.push(`PDF Content (Truncated): ${pdfText ? pdfText.slice(0, 12000) : ''}`);
+            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl] };
+        }
+
+        if (!primaryType.includes('text/html')) {
+            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl] };
+        }
+
+        const html = await primaryRes.text();
+        const primaryText = this.stripHtmlToText(html).slice(0, 12000);
+        pieces.push(`Primary Page Text (Truncated): ${primaryText}`);
+
+        const candidates = this.rankCandidateUrls(this.extractCandidateUrlsFromHtml(html, baseUrl), baseUrl)
+            .slice(0, 5);
+
+        const candidateLinks = Array.from(new Set([baseUrl, ...candidates])).slice(0, 6);
+        if (candidates.length) {
+            pieces.push(`Candidate Official Links: ${candidates.slice(0, 3).join(' | ')}`);
+        }
+
+        const deepUrls = candidates.slice(0, 2);
+        const deepParts: string[] = [];
+        for (const u of deepUrls) {
+            const res = await this.fetchWithTimeout(u, 12000);
+            if (!res || !res.ok) {
+                deepParts.push(`Linked Source: ${u}`);
+                continue;
+            }
+            const ct = (res.headers.get('content-type') || '').toLowerCase();
+            if (ct.includes('application/pdf') || /\.(pdf)(\?|$)/i.test(u)) {
+                const buf = await res.arrayBuffer();
+                const pdfText = this.extractTextFromPdf(buf);
+                if (pdfText) deepParts.push(`PDF Extract (${u}): ${pdfText.slice(0, 12000)}`);
+                else deepParts.push(`PDF Link: ${u}`);
+                continue;
+            }
+            if (ct.includes('text/html')) {
+                const deepHtml = await res.text();
+                const deepText = this.stripHtmlToText(deepHtml).slice(0, 12000);
+                deepParts.push(`Linked Page Text (${u}): ${deepText}`);
+            } else {
+                deepParts.push(`Linked Source: ${u}`);
+            }
+        }
+
+        if (deepParts.length) {
+            pieces.push(`Deep Extraction:\n${deepParts.join('\n\n')}`.slice(0, 20000));
+        }
+
+        return { context: pieces.join('\n\n').slice(0, 26000), candidateLinks };
+    }
+
     private isClaritySufficient(job: ParsedJob): boolean {
         const title = (job.title || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
         const info = (job.shortInfo || '').toLowerCase().replace(/\s{2,}/g, ' ').trim();
@@ -231,14 +413,13 @@ export class AutoAgent {
             console.warn('Failed to fetch Gemini model list, using default:', targetModel);
         }
 
-        // 2. Fetch Page Content (Truncated)
+        // 2. Fetch Page Content + Deep Extraction (Truncated)
         let pageContext = `Snippet: ${result.snippet}`;
+        let candidateLinks: string[] = [result.link];
         try {
-            // console.log(`Fetching content for: ${result.link}`);
-            const pageContent = await this.fetchPageContent(result.link);
-            if (pageContent) {
-                pageContext = `Full Page Content (Truncated to 10k chars): ${pageContent.slice(0, 10000)}`;
-            }
+            const built = await this.buildDeepContext(result.link, result.snippet);
+            pageContext = built.context;
+            candidateLinks = built.candidateLinks;
         } catch (err) {
             console.warn(`Failed to fetch ${result.link}, using snippet only.`);
         }
@@ -321,6 +502,10 @@ export class AutoAgent {
                 importantLinks: links,
                 applyLink: sanitizeUrl(result.link)
             });
+            const inferredApplyLink =
+                links.find(l => /apply|registration|online\s*form/i.test(l.label) || /apply|registration/i.test(l.url))?.url ||
+                links.find(l => isTrustedDomainShared(l.url))?.url ||
+                sanitizeUrl(result.link);
             return {
                 title: derivedTitle,
                 category: parsed.category || 'Other',
@@ -330,7 +515,7 @@ export class AutoAgent {
                 ageLimit: JSON.stringify(parsed.ageLimit || ["See Notification"]),
                 vacancyDetails: JSON.stringify(parsed.vacancyDetails || []),
                 importantLinks: JSON.stringify(links),
-                applyLink: sanitizeUrl(result.link)
+                applyLink: inferredApplyLink
             };
 
         } catch (e) {
@@ -376,7 +561,10 @@ export class AutoAgent {
             const eligibility = foundEligibility.length > 0 ? foundEligibility.join(' / ') : 'See Details';
             const vacancyDetails = [{ postName, totalPost, eligibility }];
 
-            const fallbackLinks = [{ label: "Source Link", url: result.link }];
+            const fallbackLinks = Array.from(new Set([
+                ...candidateLinks.filter(u => !!u).slice(0, 3),
+                result.link
+            ])).map((u, idx) => ({ label: idx === 0 ? "Official Link" : "Source Link", url: u }));
             const fallbackTitle = deriveReadableTitle({
                 title: String(result.title || ''),
                 shortInfo: String(snippet || ''),
@@ -393,7 +581,7 @@ export class AutoAgent {
                 ageLimit: JSON.stringify(ageLimitArr),
                 vacancyDetails: JSON.stringify(vacancyDetails),
                 importantLinks: JSON.stringify(fallbackLinks),
-                applyLink: result.link
+                applyLink: fallbackLinks.find(l => /Official/i.test(l.label))?.url || result.link
             };
         }
     }
@@ -418,12 +606,7 @@ export class AutoAgent {
             if (contentType.includes('application/pdf')) return null;
 
             const html = await response.text();
-            // Simple strip tags to get text content
-            return html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, "")
-                .replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, "")
-                .replace(/<[^>]+>/g, "\n")
-                .replace(/\s+/g, " ")
-                .trim();
+            return this.stripHtmlToText(html);
         } catch (e) {
             return null;
         }
