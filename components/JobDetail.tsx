@@ -198,19 +198,50 @@ const JobDetail: React.FC<Props> = ({ job, onBack }) => {
                   <table className="w-full text-sm text-left">
                       <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider text-xs">
                           <tr>
-                              <th className="px-6 py-4 font-bold border-b">{t.postName}</th>
-                              <th className="px-6 py-4 font-bold border-b">{t.totalPost}</th>
-                              <th className="px-6 py-4 font-bold border-b">{t.eligibilityCriteria}</th>
+                              {(() => {
+                                const cols = Array.isArray((job as any).vacancyColumns) && (job as any).vacancyColumns.length
+                                  ? (job as any).vacancyColumns
+                                  : [
+                                      { key: 'postName', label: t.postName },
+                                      { key: 'totalPost', label: t.totalPost },
+                                      { key: 'eligibility', label: t.eligibilityCriteria }
+                                    ];
+                                return cols.map((c: any) => {
+                                  const key = String(c?.key || '');
+                                  const label = key === 'postName' ? t.postName : key === 'totalPost' ? t.totalPost : key === 'eligibility' ? t.eligibilityCriteria : String(c?.label || key);
+                                  return (
+                                    <th key={key} className="px-6 py-4 font-bold border-b whitespace-nowrap">{label}</th>
+                                  );
+                                });
+                              })()}
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                          {job.vacancyDetails.map((row, idx) => (
+                          {(() => {
+                            const cols = Array.isArray((job as any).vacancyColumns) && (job as any).vacancyColumns.length
+                              ? (job as any).vacancyColumns
+                              : [
+                                  { key: 'postName', label: t.postName },
+                                  { key: 'totalPost', label: t.totalPost },
+                                  { key: 'eligibility', label: t.eligibilityCriteria }
+                                ];
+                            return job.vacancyDetails.map((row: any, idx: number) => (
                               <tr key={idx} className="hover:bg-red-50/50 transition-colors">
-                                  <td className="px-6 py-4 font-bold text-red-700 whitespace-nowrap">{String(row?.postName || '')}</td>
-                                  <td className="px-6 py-4 font-bold text-gray-800">{String(row?.totalPost || '')}</td>
-                                  <td className="px-6 py-4 text-gray-600 leading-relaxed min-w-[300px]">{String(row?.eligibility || '')}</td>
+                                {cols.map((c: any) => {
+                                  const key = String(c?.key || '');
+                                  const value = String(row?.[key] ?? '');
+                                  const cls = key === 'postName'
+                                    ? 'px-6 py-4 font-bold text-red-700 whitespace-nowrap'
+                                    : key === 'totalPost'
+                                      ? 'px-6 py-4 font-bold text-gray-800 whitespace-nowrap'
+                                      : 'px-6 py-4 text-gray-600 leading-relaxed min-w-[240px]';
+                                  return (
+                                    <td key={key} className={cls}>{value}</td>
+                                  );
+                                })}
                               </tr>
-                          ))}
+                            ));
+                          })()}
                       </tbody>
                   </table>
               </div>

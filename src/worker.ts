@@ -485,6 +485,93 @@ async function handleGetSubscribers(request: Request, env: Env): Promise<Respons
 
 // ==================== JOB DETAILS CRUD ====================
 
+type VacancyColumn = { key: string; label: string };
+type VacancyRow = Record<string, string>;
+
+const DEFAULT_VACANCY_COLUMNS: VacancyColumn[] = [
+    { key: 'postName', label: 'Post Name' },
+    { key: 'totalPost', label: 'Total Post' },
+    { key: 'eligibility', label: 'Eligibility' }
+];
+
+function sanitizeVacancyKey(key: string): string {
+    const cleaned = String(key || '').trim().replace(/[^a-zA-Z0-9_]/g, '');
+    if (!cleaned) return '';
+    if (!/^[a-zA-Z]/.test(cleaned)) return '';
+    return cleaned.slice(0, 32);
+}
+
+function sanitizeVacancyLabel(label: string): string {
+    return sanitizeString(String(label || ''), 50);
+}
+
+function normalizeVacancyData(parsed: any): { columns: VacancyColumn[]; rows: VacancyRow[] } {
+    const ensureRequired = (cols: VacancyColumn[]) => {
+        const keys = new Set(cols.map(c => c.key));
+        const out = [...cols];
+        for (const req of DEFAULT_VACANCY_COLUMNS) {
+            if (!keys.has(req.key)) out.unshift(req);
+        }
+        const seen = new Set<string>();
+        const unique = out.filter(c => {
+            if (!c.key) return false;
+            if (seen.has(c.key)) return false;
+            seen.add(c.key);
+            return true;
+        });
+        return unique.slice(0, 10);
+    };
+
+    const normalizeRows = (rows: any[], columns: VacancyColumn[]) => {
+        const colKeys = columns.map(c => c.key);
+        const out: VacancyRow[] = [];
+        for (const r of rows.slice(0, 60)) {
+            const obj: VacancyRow = {};
+            for (const k of colKeys) {
+                obj[k] = sanitizeString(String((r as any)?.[k] ?? ''), 2000);
+            }
+            out.push(obj);
+        }
+        return out;
+    };
+
+    if (Array.isArray(parsed)) {
+        const rowsRaw = parsed;
+        const extraKeys = new Set<string>();
+        const rowsSan: VacancyRow[] = rowsRaw.slice(0, 60).map((r: any) => {
+            const obj: VacancyRow = {
+                postName: sanitizeString(String(r?.postName ?? ''), 500),
+                totalPost: sanitizeString(String(r?.totalPost ?? ''), 200),
+                eligibility: sanitizeString(String(r?.eligibility ?? ''), 2000)
+            };
+            if (r && typeof r === 'object') {
+                for (const [k, v] of Object.entries(r)) {
+                    const kk = sanitizeVacancyKey(k);
+                    if (!kk) continue;
+                    if (kk === 'postName' || kk === 'totalPost' || kk === 'eligibility') continue;
+                    extraKeys.add(kk);
+                    obj[kk] = sanitizeString(String(v ?? ''), 2000);
+                }
+            }
+            return obj;
+        });
+        const extras: VacancyColumn[] = Array.from(extraKeys).slice(0, 7).map(k => ({ key: k, label: k }));
+        return { columns: ensureRequired([...DEFAULT_VACANCY_COLUMNS, ...extras]), rows: rowsSan };
+    }
+
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.rows)) {
+        const colsRaw = Array.isArray(parsed.columns) ? parsed.columns : [];
+        const colsSan: VacancyColumn[] = colsRaw
+            .map((c: any) => ({ key: sanitizeVacancyKey(String(c?.key || '')), label: sanitizeVacancyLabel(String(c?.label || c?.key || '')) }))
+            .filter(c => !!c.key && !!c.label);
+        const columns = ensureRequired(colsSan.length ? colsSan : DEFAULT_VACANCY_COLUMNS);
+        const rows = normalizeRows(parsed.rows, columns);
+        return { columns, rows };
+    }
+
+    return { columns: DEFAULT_VACANCY_COLUMNS, rows: [] };
+}
+
 interface JobDetailRequest {
     id: string;
     title: string;
@@ -494,7 +581,8 @@ interface JobDetailRequest {
     importantDates?: string[];
     applicationFee?: string[];
     ageLimit?: string[];
-    vacancyDetails?: { postName: string; totalPost: string; eligibility: string }[];
+    vacancyColumns?: VacancyColumn[];
+    vacancyDetails?: VacancyRow[];
     importantLinks?: { label: string; url: string }[];
     applyLink?: string;
 }
@@ -523,14 +611,7 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
             const importantDates = JSON.parse(row.important_dates || '[]');
             const applicationFee = JSON.parse(row.application_fee || '[]');
             const ageLimit = JSON.parse(row.age_limit || '[]');
-            const vacancyDetailsRaw = JSON.parse(row.vacancy_details || '[]');
-            const vacancyDetails = Array.isArray(vacancyDetailsRaw)
-                ? vacancyDetailsRaw.map((v: any) => ({
-                    postName: String(v?.postName || ''),
-                    totalPost: String(v?.totalPost || ''),
-                    eligibility: String(v?.eligibility || '')
-                }))
-                : [];
+            const vacancyParsed = normalizeVacancyData(JSON.parse(row.vacancy_details || '[]'));
             const importantLinks = (JSON.parse(row.important_links || '[]') as any[]).map((l: any) => ({
                 label: String(l?.label || ''),
                 url: String(l?.url || '').replace(/`/g, '').trim()
@@ -557,7 +638,8 @@ async function handleGetAllJobs(request: Request, env: Env): Promise<Response> {
                 importantDates,
                 applicationFee,
                 ageLimit,
-                vacancyDetails,
+                vacancyDetails: vacancyParsed.rows,
+                vacancyColumns: vacancyParsed.columns,
                 importantLinks,
                 applyLink
             };
@@ -586,14 +668,7 @@ async function handleGetJob(request: Request, env: Env, jobId: string): Promise<
         const importantDates = JSON.parse((job as any).important_dates || '[]');
         const applicationFee = JSON.parse((job as any).application_fee || '[]');
         const ageLimit = JSON.parse((job as any).age_limit || '[]');
-        const vacancyDetailsRaw = JSON.parse((job as any).vacancy_details || '[]');
-        const vacancyDetails = Array.isArray(vacancyDetailsRaw)
-            ? vacancyDetailsRaw.map((v: any) => ({
-                postName: String(v?.postName || ''),
-                totalPost: String(v?.totalPost || ''),
-                eligibility: String(v?.eligibility || '')
-            }))
-            : [];
+        const vacancyParsed = normalizeVacancyData(JSON.parse((job as any).vacancy_details || '[]'));
         const importantLinks = (JSON.parse((job as any).important_links || '[]') as any[]).map((l: any) => ({
             label: String(l?.label || ''),
             url: String(l?.url || '').replace(/`/g, '').trim()
@@ -615,7 +690,8 @@ async function handleGetJob(request: Request, env: Env, jobId: string): Promise<
             importantDates,
             applicationFee,
             ageLimit,
-            vacancyDetails,
+            vacancyDetails: vacancyParsed.rows,
+            vacancyColumns: vacancyParsed.columns,
             importantLinks,
             applyLink
         };
@@ -660,7 +736,8 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
         const importantDates = body.importantDates || [];
         const applicationFee = body.applicationFee || [];
         const ageLimit = body.ageLimit || [];
-        const vacancyDetails = body.vacancyDetails || [];
+        const vacancyDetails = Array.isArray(body.vacancyDetails) ? body.vacancyDetails : [];
+        const vacancyColumns = Array.isArray(body.vacancyColumns) ? body.vacancyColumns : [];
         const importantLinks = body.importantLinks || [];
         const applyLink = sanitizeString(body.applyLink || importantLinks?.[0]?.url || '', 2000);
 
@@ -675,6 +752,13 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
             return errorResponse(verdict.reason || 'Invalid job', 400, origin);
         }
         const normalizedTitle = sanitizeString(verdict.normalizedTitle || title, 200);
+
+        const vacancyPayload = vacancyColumns.length
+            ? normalizeVacancyData({ columns: vacancyColumns, rows: vacancyDetails })
+            : normalizeVacancyData(vacancyDetails);
+        const vacancyDetailsJson = vacancyColumns.length
+            ? JSON.stringify({ columns: vacancyPayload.columns, rows: vacancyPayload.rows })
+            : JSON.stringify(vacancyPayload.rows);
 
         // Check if exists
         const existing = await env.DB.prepare('SELECT id FROM job_details WHERE id = ?')
@@ -694,7 +778,7 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
                 JSON.stringify(importantDates),
                 JSON.stringify(applicationFee),
                 JSON.stringify(ageLimit),
-                JSON.stringify(vacancyDetails),
+                vacancyDetailsJson,
                 JSON.stringify(importantLinks),
                 applyLink,
                 id
@@ -720,7 +804,7 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
                 JSON.stringify(importantDates),
                 JSON.stringify(applicationFee),
                 JSON.stringify(ageLimit),
-                JSON.stringify(vacancyDetails),
+                vacancyDetailsJson,
                 JSON.stringify(importantLinks),
                 applyLink
             ).run();
@@ -1131,14 +1215,7 @@ export default {
             const importantDates = JSON.parse((job as any).important_dates || '[]');
             const applicationFee = JSON.parse((job as any).application_fee || '[]');
             const ageLimit = JSON.parse((job as any).age_limit || '[]');
-            const vacancyDetailsRaw = JSON.parse((job as any).vacancy_details || '[]');
-            const vacancyDetails = Array.isArray(vacancyDetailsRaw)
-                ? vacancyDetailsRaw.map((v: any) => ({
-                    postName: String(v?.postName || ''),
-                    totalPost: String(v?.totalPost || ''),
-                    eligibility: String(v?.eligibility || '')
-                }))
-                : [];
+            const vacancyParsed = normalizeVacancyData(JSON.parse((job as any).vacancy_details || '[]'));
             const importantLinks = (JSON.parse((job as any).important_links || '[]') as any[]).map((l: any) => ({
                 label: String(l?.label || ''),
                 url: String(l?.url || '').replace(/`/g, '').trim()
@@ -1163,7 +1240,8 @@ export default {
                     importantDates,
                     applicationFee,
                     ageLimit,
-                    vacancyDetails,
+                    vacancyDetails: vacancyParsed.rows,
+                    vacancyColumns: vacancyParsed.columns,
                     importantLinks,
                     applyLink,
                     isActive: Number((job as any).is_active ?? 1)

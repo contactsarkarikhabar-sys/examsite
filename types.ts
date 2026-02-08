@@ -26,11 +26,16 @@ export interface LinkItem {
   url: string;
 }
 
-export interface VacancyItem {
+export interface VacancyColumn {
+  key: string;
+  label: string;
+}
+
+export type VacancyRow = Record<string, string> & {
   postName: string;
   totalPost: string;
   eligibility: string;
-}
+};
 
 export interface JobDetailData {
   id: string;
@@ -40,7 +45,8 @@ export interface JobDetailData {
   importantDates: string[];
   applicationFee: string[];
   ageLimit: string[];
-  vacancyDetails: VacancyItem[];
+  vacancyDetails: VacancyRow[];
+  vacancyColumns?: VacancyColumn[];
   importantLinks: LinkItem[];
   videoLink?: string; // YouTube Video ID or URL
 }

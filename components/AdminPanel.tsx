@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, Users, Bell, Loader2, CheckCircle, AlertCircle, Lock, Plus, Trash2, Copy, Edit, Search } from 'lucide-react';
 import { jobService } from '../services/jobService';
 import { useLanguage } from '../contexts/LanguageContext';
-import { VacancyItem, LinkItem, JobDetailData } from '../types';
+import { VacancyColumn, VacancyRow, LinkItem, JobDetailData } from '../types';
 import { JOB_DETAILS_DB } from '../constants';
 
 interface Props {
@@ -20,7 +20,12 @@ const emptyJobForm = {
     importantDates: [''],
     applicationFee: [''],
     ageLimit: [''],
-    vacancyDetails: [{ postName: '', totalPost: '', eligibility: '' }],
+    vacancyColumns: [
+        { key: 'postName', label: 'Post Name' },
+        { key: 'totalPost', label: 'Total Post' },
+        { key: 'eligibility', label: 'Eligibility / Pay Scale' }
+    ] as VacancyColumn[],
+    vacancyDetails: [{ postName: '', totalPost: '', eligibility: '' }] as VacancyRow[],
     importantLinks: [{ label: '', url: '' }]
 };
 
@@ -48,6 +53,8 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     const [generatedCode, setGeneratedCode] = useState('');
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedJobId, setSelectedJobId] = useState('');
+    const [newVacancyColKey, setNewVacancyColKey] = useState('');
+    const [newVacancyColLabel, setNewVacancyColLabel] = useState('');
     const [searchFilter, setSearchFilter] = useState('');
     const [pendingJobs, setPendingJobs] = useState<Array<{ id: string; title: string; post_date?: string; is_active?: number; created_by?: string; source_domain?: string; updated_at?: string }>>([]);
     const [pendingView, setPendingView] = useState<'pending' | 'active' | 'all'>('pending');
@@ -106,6 +113,9 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
                 importantDates: Array.isArray(job.importantDates) && job.importantDates.length ? job.importantDates : [''],
                 applicationFee: Array.isArray(job.applicationFee) && job.applicationFee.length ? job.applicationFee : [''],
                 ageLimit: Array.isArray(job.ageLimit) && job.ageLimit.length ? job.ageLimit : [''],
+                vacancyColumns: Array.isArray(job.vacancyColumns) && job.vacancyColumns.length
+                    ? job.vacancyColumns
+                    : emptyJobForm.vacancyColumns,
                 vacancyDetails: Array.isArray(job.vacancyDetails) && job.vacancyDetails.length ? job.vacancyDetails : [{ postName: '', totalPost: '', eligibility: '' }],
                 importantLinks: Array.isArray(job.importantLinks) && job.importantLinks.length ? job.importantLinks : [{ label: '', url: '' }]
             });
@@ -202,9 +212,14 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
 
     // Vacancy management
     const addVacancy = () => {
+        const row: any = {};
+        for (const c of fullJobForm.vacancyColumns) row[c.key] = '';
+        row.postName = row.postName ?? '';
+        row.totalPost = row.totalPost ?? '';
+        row.eligibility = row.eligibility ?? '';
         setFullJobForm({
             ...fullJobForm,
-            vacancyDetails: [...fullJobForm.vacancyDetails, { postName: '', totalPost: '', eligibility: '' }]
+            vacancyDetails: [...fullJobForm.vacancyDetails, row]
         });
     };
 
@@ -216,10 +231,40 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         });
     };
 
-    const updateVacancy = (index: number, field: keyof VacancyItem, value: string) => {
+    const updateVacancy = (index: number, field: string, value: string) => {
         const newArr = [...fullJobForm.vacancyDetails];
         newArr[index] = { ...newArr[index], [field]: value };
         setFullJobForm({ ...fullJobForm, vacancyDetails: newArr });
+    };
+
+    const addVacancyColumn = () => {
+        const keyRaw = (newVacancyColKey || '').trim().replace(/[^a-zA-Z0-9_]/g, '');
+        const key = keyRaw && /^[a-zA-Z]/.test(keyRaw) ? keyRaw.slice(0, 32) : '';
+        const label = (newVacancyColLabel || '').trim().slice(0, 50);
+        if (!key || !label) return;
+        const existingKeys = new Set(fullJobForm.vacancyColumns.map(c => c.key));
+        if (existingKeys.has(key)) return;
+        const columns = [...fullJobForm.vacancyColumns, { key, label }];
+        const rows = fullJobForm.vacancyDetails.map(r => ({ ...r, [key]: String((r as any)?.[key] ?? '') }));
+        setFullJobForm({ ...fullJobForm, vacancyColumns: columns, vacancyDetails: rows });
+        setNewVacancyColKey('');
+        setNewVacancyColLabel('');
+    };
+
+    const removeVacancyColumn = (key: string) => {
+        if (key === 'postName' || key === 'totalPost' || key === 'eligibility') return;
+        const columns = fullJobForm.vacancyColumns.filter(c => c.key !== key);
+        const rows = fullJobForm.vacancyDetails.map(r => {
+            const copy: any = { ...r };
+            delete copy[key];
+            return copy;
+        });
+        setFullJobForm({ ...fullJobForm, vacancyColumns: columns, vacancyDetails: rows });
+    };
+
+    const updateVacancyColumnLabel = (key: string, label: string) => {
+        const columns = fullJobForm.vacancyColumns.map(c => c.key === key ? { ...c, label } : c);
+        setFullJobForm({ ...fullJobForm, vacancyColumns: columns });
     };
 
     // Links management
@@ -327,7 +372,17 @@ ${detailsCode}
             importantDates: fullJobForm.importantDates.filter(d => d),
             applicationFee: fullJobForm.applicationFee.filter(f => f),
             ageLimit: fullJobForm.ageLimit.filter(a => a),
-            vacancyDetails: fullJobForm.vacancyDetails.filter(v => v.postName),
+            vacancyColumns: fullJobForm.vacancyColumns,
+            vacancyDetails: fullJobForm.vacancyDetails
+                .filter(v => String((v as any)?.postName || '').trim().length > 0)
+                .map(v => {
+                    const row: any = {};
+                    for (const c of fullJobForm.vacancyColumns) row[c.key] = String((v as any)?.[c.key] ?? '');
+                    row.postName = String((v as any)?.postName ?? '');
+                    row.totalPost = String((v as any)?.totalPost ?? '');
+                    row.eligibility = String((v as any)?.eligibility ?? '');
+                    return row;
+                }),
             importantLinks: fullJobForm.importantLinks.filter(l => l.label)
         }, password);
 
@@ -372,6 +427,7 @@ ${detailsCode}
                 importantDates: job.importantDates.length ? job.importantDates : [''],
                 applicationFee: job.applicationFee.length ? job.applicationFee : [''],
                 ageLimit: job.ageLimit.length ? job.ageLimit : [''],
+                vacancyColumns: emptyJobForm.vacancyColumns,
                 vacancyDetails: job.vacancyDetails.length ? job.vacancyDetails : [{ postName: '', totalPost: '', eligibility: '' }],
                 importantLinks: job.importantLinks.length ? job.importantLinks : [{ label: '', url: '' }]
             });
@@ -852,35 +908,78 @@ ${detailsCode}
                                                     <Plus size={14} /> Add Post
                                                 </button>
                                             </div>
-                                            {fullJobForm.vacancyDetails.map((vacancy, i) => (
-                                                <div key={i} className="bg-white p-3 rounded-lg mb-2 border">
-                                                    <div className="grid grid-cols-3 gap-2 mb-2">
-                                                        <input
-                                                            type="text"
-                                                            value={vacancy.postName}
-                                                            onChange={e => updateVacancy(i, 'postName', e.target.value)}
-                                                            className="border border-gray-300 rounded-lg p-2 text-sm"
-                                                            placeholder="Post Name"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={vacancy.totalPost}
-                                                            onChange={e => updateVacancy(i, 'totalPost', e.target.value)}
-                                                            className="border border-gray-300 rounded-lg p-2 text-sm"
-                                                            placeholder="Total Posts"
-                                                        />
-                                                        <div className="flex gap-1">
+                                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+                                                <div className="flex flex-col md:flex-row md:items-center gap-2 mb-3">
+                                                    <input
+                                                        type="text"
+                                                        value={newVacancyColKey}
+                                                        onChange={e => setNewVacancyColKey(e.target.value)}
+                                                        className="md:w-1/3 border border-gray-300 rounded-lg p-2 text-sm"
+                                                        placeholder="Column key (e.g. payScale)"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={newVacancyColLabel}
+                                                        onChange={e => setNewVacancyColLabel(e.target.value)}
+                                                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
+                                                        placeholder="Heading label (e.g. Pay Scale)"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={addVacancyColumn}
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2"
+                                                    >
+                                                        <Plus size={14} /> Add Column
+                                                    </button>
+                                                </div>
+
+                                                <div
+                                                    className="grid gap-2"
+                                                    style={{ gridTemplateColumns: `repeat(${Math.max(1, fullJobForm.vacancyColumns.length)}, minmax(0, 1fr))` }}
+                                                >
+                                                    {fullJobForm.vacancyColumns.map((c) => (
+                                                        <div key={c.key} className="flex items-center gap-1">
                                                             <input
                                                                 type="text"
-                                                                value={vacancy.eligibility}
-                                                                onChange={e => updateVacancy(i, 'eligibility', e.target.value)}
-                                                                className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
-                                                                placeholder="Eligibility"
+                                                                value={c.label}
+                                                                onChange={e => updateVacancyColumnLabel(c.key, e.target.value)}
+                                                                className="flex-1 border border-gray-300 rounded-lg p-2 text-xs font-bold"
+                                                                placeholder="Heading"
                                                             />
-                                                            <button type="button" onClick={() => removeVacancy(i)} className="text-red-500 p-2">
-                                                                <Trash2 size={16} />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeVacancyColumn(c.key)}
+                                                                disabled={c.key === 'postName' || c.key === 'totalPost' || c.key === 'eligibility'}
+                                                                className="text-red-500 disabled:text-gray-300 p-2"
+                                                            >
+                                                                <Trash2 size={14} />
                                                             </button>
                                                         </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {fullJobForm.vacancyDetails.map((vacancy, i) => (
+                                                <div key={i} className="bg-white p-3 rounded-lg mb-2 border">
+                                                    <div
+                                                        className="grid gap-2"
+                                                        style={{ gridTemplateColumns: `repeat(${Math.max(1, fullJobForm.vacancyColumns.length)}, minmax(0, 1fr))` }}
+                                                    >
+                                                        {fullJobForm.vacancyColumns.map((c) => (
+                                                            <input
+                                                                key={c.key}
+                                                                type="text"
+                                                                value={String((vacancy as any)?.[c.key] ?? '')}
+                                                                onChange={e => updateVacancy(i, c.key, e.target.value)}
+                                                                className="border border-gray-300 rounded-lg p-2 text-sm"
+                                                                placeholder={c.label}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex justify-end mt-2">
+                                                        <button type="button" onClick={() => removeVacancy(i)} className="text-red-500 p-2">
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))}
