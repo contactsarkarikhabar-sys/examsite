@@ -57,9 +57,26 @@ export class AutoAgent {
             'afcat.cdac.in',
             'agnipathvayu.cdac.in',
             'joinindianarmy.nic.in',
-            'joinindiannavy.gov.in'
+            'joinindiannavy.gov.in',
+            'nta.ac.in',
+            'ugc.gov.in',
+            'ongcindia.com',
+            'iocl.com',
+            'bpcl.in',
+            'hindustanpetroleum.com',
+            'hpcl.co.in',
+            'ntpc.co.in',
+            'powergrid.in',
+            'gailonline.com',
+            'coalindia.in',
+            'sail.co.in',
+            'bhel.com',
+            'bel-india.in',
+            'hal-india.co.in'
         ].some(d => host === d || host.endsWith(`.${d}`));
-        const isCentralKeyword = /(ssc|upsc|railway|rrb|ntpc|alp|group\s*d|ibps|sbi|rbi|lic|afcat|agniveer|agnipath|army|navy|air\s*force)/i.test(text);
+        const isCentralKeyword = /(ssc|upsc|railway|rrb|ntpc|alp|group\s*d|ibps|sbi|rbi|lic|afcat|agniveer|agnipath|army|navy|air\s*force|psu|ongc|iocl|bpcl|hpcl|gail|powergrid|coal\s*india|sail|bhel|bel|hal|gate|ugc|ugc\s*net|csir|csir\s*net|jee|neet|cuet|nta)/i.test(text);
+        const isGatePortal = /^gate\d{4}\./.test(host) && host.endsWith('.ac.in');
+        const isNtaSub = host === 'nta.ac.in' || host.endsWith('.nta.ac.in');
 
         const isUpDomain = host.endsWith('.up.nic.in') || host === 'upsssc.gov.in' || host === 'uppbpb.gov.in' || host.endsWith('.up.gov.in') || host === 'up.gov.in';
         const isUpKeyword = /(uttar\s*pradesh|\bup\b|uppsc|upsssc|uppbpb|up\s*police|pradesh)/i.test(text) || /\bup\b/.test(host) || /\bup\b/.test(path);
@@ -67,7 +84,7 @@ export class AutoAgent {
         const isBiharDomain = host.endsWith('.bih.nic.in') || host.endsWith('.bihar.gov.in') || host === 'bihar.gov.in' || host === 'csbc.bih.nic.in';
         const isBiharKeyword = /(bihar|bpsc|csbc|bssc)/i.test(text);
 
-        if (isCentralDomain || isCentralKeyword) return 0;
+        if (isCentralDomain || isCentralKeyword || isGatePortal || isNtaSub) return 0;
         if (isUpDomain || isUpKeyword) return 1;
         if (isBiharDomain || isBiharKeyword) return 2;
         return 3;
@@ -387,22 +404,33 @@ export class AutoAgent {
             console.log('Starting AutoAgent run...');
             const currentYear = new Date().getFullYear();
 
-            const query = `(site:gov.in OR site:nic.in) recruitment notification ${currentYear}`;
+            const queries = [
+                `(site:gov.in OR site:nic.in) recruitment notification ${currentYear}`,
+                `(site:gov.in OR site:nic.in OR site:ongcindia.com OR site:iocl.com OR site:ntpc.co.in OR site:powergrid.in) PSU recruitment ${currentYear}`,
+                `(site:nta.ac.in OR site:ugc.gov.in OR site:gov.in OR site:nic.in) (GATE OR UGC NET OR CSIR NET OR CUET OR JEE OR NEET) ${currentYear} notification`,
+                `(site:nta.ac.in OR site:ugc.gov.in) application form ${currentYear}`
+            ];
 
-            const { results, debug } = await this.searchSerpApi(query);
+            const allResults: SearchResult[] = [];
+            const debugBundle: any[] = [];
+            for (const q of queries) {
+                const { results, debug } = await this.searchSerpApi(q);
+                allResults.push(...results);
+                debugBundle.push(debug);
+            }
 
-            if (results.length === 0) {
+            if (allResults.length === 0) {
                 return {
                     success: true,
                     message: `No new jobs found.`,
                     jobsAdded: 0,
-                    debug
+                    debug: { queries: debugBundle }
                 };
             }
 
             // Process results
             let jobsAdded = 0;
-            const uniqueResults = await this.filterExistingJobs(results);
+            const uniqueResults = await this.filterExistingJobs(allResults);
             const prioritizedResults = this.sortResultsByPreference(uniqueResults);
 
             console.log(`Found ${prioritizedResults.length} unique results to analyze.`);
@@ -435,10 +463,10 @@ export class AutoAgent {
 
             return {
                 success: true,
-                message: `Processed ${results.length} results. Added ${jobsAdded} new jobs.`,
+                message: `Processed ${allResults.length} results. Added ${jobsAdded} new jobs.`,
                 jobsAdded,
                 debug: {
-                    ...debug,
+                    queries: debugBundle,
                     uniqueResults: prioritizedResults.length,
                     skippedReasons
                 }
@@ -567,7 +595,7 @@ export class AutoAgent {
             RULES:
             1. **DO NOT GUESS**: If exact dates/fees are missing, use "Check Notification" / "See Notification" (do not invent values).
             2. **DO NOT FAIL**: Mispelled words or partial data is OKAY. Return the best possible JSON.
-            3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, Other].
+            3. **Categories**: Choose matching category from [SSC, Railway, Banking, Police, Teaching, Defence, UPSC, Medical, Engineering, PSU, Admission, Exam, Other].
             
             Return ONLY a valid JSON object with this schema:
             {

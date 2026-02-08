@@ -80,6 +80,30 @@ export const isAllowedSourceUrl = (link: string, title: string, snippet: string)
     'lic',
     'afcat',
     'agniveer',
+    'psu',
+    'ongc',
+    'iocl',
+    'bpcl',
+    'hpcl',
+    'ntpc',
+    'powergrid',
+    'gail',
+    'coal india',
+    'sail',
+    'bhel',
+    'bel',
+    'hal',
+    'isro',
+    'drdo',
+    'gate',
+    'ugc',
+    'ugc net',
+    'csir',
+    'csir net',
+    'jee',
+    'neet',
+    'cuet',
+    'nta',
     'uppsc',
     'upsssc',
     'rpsc',
@@ -118,19 +142,43 @@ export const isAllowedSourceUrl = (link: string, title: string, snippet: string)
       'csbc.bih.nic.in',
       'uppbpb.gov.in',
       'upsssc.gov.in',
-      'uppsc.up.nic.in'
+      'uppsc.up.nic.in',
+      'nta.ac.in',
+      'ugc.gov.in',
+      'isro.gov.in',
+      'drdo.gov.in',
+      'onlinesbi.sbi',
+      'ongcindia.com',
+      'iocl.com',
+      'bpcl.in',
+      'hindustanpetroleum.com',
+      'hpcl.co.in',
+      'ntpc.co.in',
+      'powergrid.in',
+      'gailonline.com',
+      'coalindia.in',
+      'sail.co.in',
+      'bhel.com',
+      'bel-india.in',
+      'hal-india.co.in'
     ];
     const isKnownBoard = knownBoards.some(d => host === d || host.endsWith(`.${d}`));
     if (isKnownBoard) return true;
 
     const isGov = host.endsWith('.gov.in') || host.endsWith('.nic.in');
-    const recruitmentPath = /(recruit|career|vacanc|notification|advertis|employment|jobs?)/i.test(path);
-    if (isGov && hasKeyword && recruitmentPath) return true;
-    if (isGov && recruitmentPath) return true;
+    const relevantPath = /(recruit|career|vacanc|notification|advertis|employment|jobs?|admission|exam|entrance|gate|ugc|net|csir|jee|neet|cuet)/i.test(path);
+    if (isGov && hasKeyword && relevantPath) return true;
+    if (isGov && relevantPath) return true;
     if (isGov && hasKeywordAnywhere) return true;
+
+    const isNta = host === 'nta.ac.in' || host.endsWith('.nta.ac.in');
+    if (isNta) return true;
+
+    const isGatePortal = /^gate\d{4}\./.test(host) && host.endsWith('.ac.in');
+    if (isGatePortal) return true;
+
     return false;
   } catch {
     return false;
   }
 };
-
