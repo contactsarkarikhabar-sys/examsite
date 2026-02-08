@@ -35,6 +35,56 @@ export class AutoAgent {
         this.env = env;
     }
 
+    private getResultTier(result: SearchResult): number {
+        const text = `${result.title || ''} ${result.snippet || ''} ${result.link || ''}`.toLowerCase();
+        let host = '';
+        let path = '';
+        try {
+            const u = new URL(result.link);
+            host = u.hostname.toLowerCase();
+            path = u.pathname.toLowerCase();
+        } catch {}
+
+        const isCentralDomain = [
+            'ssc.gov.in',
+            'upsc.gov.in',
+            'indianrailways.gov.in',
+            'ibps.in',
+            'sbi.co.in',
+            'rbi.org.in',
+            'opportunities.rbi.org.in',
+            'licindia.in',
+            'afcat.cdac.in',
+            'agnipathvayu.cdac.in',
+            'joinindianarmy.nic.in',
+            'joinindiannavy.gov.in'
+        ].some(d => host === d || host.endsWith(`.${d}`));
+        const isCentralKeyword = /(ssc|upsc|railway|rrb|ntpc|alp|group\s*d|ibps|sbi|rbi|lic|afcat|agniveer|agnipath|army|navy|air\s*force)/i.test(text);
+
+        const isUpDomain = host.endsWith('.up.nic.in') || host === 'upsssc.gov.in' || host === 'uppbpb.gov.in' || host.endsWith('.up.gov.in') || host === 'up.gov.in';
+        const isUpKeyword = /(uttar\s*pradesh|\bup\b|uppsc|upsssc|uppbpb|up\s*police|pradesh)/i.test(text) || /\bup\b/.test(host) || /\bup\b/.test(path);
+
+        const isBiharDomain = host.endsWith('.bih.nic.in') || host.endsWith('.bihar.gov.in') || host === 'bihar.gov.in' || host === 'csbc.bih.nic.in';
+        const isBiharKeyword = /(bihar|bpsc|csbc|bssc)/i.test(text);
+
+        if (isCentralDomain || isCentralKeyword) return 0;
+        if (isUpDomain || isUpKeyword) return 1;
+        if (isBiharDomain || isBiharKeyword) return 2;
+        return 3;
+    }
+
+    private sortResultsByPreference(results: SearchResult[]): SearchResult[] {
+        return [...results].sort((a, b) => {
+            const ta = this.getResultTier(a);
+            const tb = this.getResultTier(b);
+            if (ta !== tb) return ta - tb;
+            const aGov = isTrustedDomainShared(a.link) ? 0 : 1;
+            const bGov = isTrustedDomainShared(b.link) ? 0 : 1;
+            if (aGov !== bGov) return aGov - bGov;
+            return 0;
+        });
+    }
+
     private stripHtmlToText(html: string): string {
         return html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, "")
             .replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, "")
@@ -353,12 +403,13 @@ export class AutoAgent {
             // Process results
             let jobsAdded = 0;
             const uniqueResults = await this.filterExistingJobs(results);
+            const prioritizedResults = this.sortResultsByPreference(uniqueResults);
 
-            console.log(`Found ${uniqueResults.length} unique results to analyze.`);
+            console.log(`Found ${prioritizedResults.length} unique results to analyze.`);
 
             const skippedReasons: string[] = [];
 
-            for (const result of uniqueResults) {
+            for (const result of prioritizedResults) {
                 console.log(`Analyzing: ${result.title}`);
                 try {
                     if (!isAllowedSourceUrl(result.link, result.title, result.snippet)) {
@@ -388,7 +439,7 @@ export class AutoAgent {
                 jobsAdded,
                 debug: {
                     ...debug,
-                    uniqueResults: uniqueResults.length,
+                    uniqueResults: prioritizedResults.length,
                     skippedReasons
                 }
             };
