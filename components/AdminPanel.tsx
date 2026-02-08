@@ -420,6 +420,22 @@ ${detailsCode}
         }
     };
 
+    const handleRunAgentNow = async () => {
+        setIsLoading(true);
+        setMessage(null);
+        const result = await jobService.runAgentNow(password);
+        setIsLoading(false);
+        if (result.success) {
+            setMessage({ type: 'success', text: `✅ Agent run complete. Added: ${result.jobsAdded || 0}` });
+            if (activeTab === 'pending') {
+                loadPending();
+            }
+            loadStats();
+        } else {
+            setMessage({ type: 'error', text: result.message || 'Agent run failed' });
+        }
+    };
+
     const handleApprove = async (jobId: string) => {
         setIsLoading(true);
         setMessage(null);
@@ -994,15 +1010,26 @@ ${detailsCode}
                                                 All
                                             </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleCleanupJunk}
-                                            disabled={isLoading}
-                                            className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
-                                        >
-                                            {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                                            Cleanup junk
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleRunAgentNow}
+                                                disabled={isLoading}
+                                                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
+                                            >
+                                                {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                                                Run agent
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleCleanupJunk}
+                                                disabled={isLoading}
+                                                className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"
+                                            >
+                                                {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                                                Cleanup junk
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {pendingJobs.length === 0 ? (

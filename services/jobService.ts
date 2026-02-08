@@ -425,4 +425,21 @@ export const jobService = {
     });
     return await response.json() as any;
   },
+
+  runAgentNow: async (adminPassword: string): Promise<{ success: boolean; message?: string; jobsAdded?: number; debug?: any }> => {
+    const workerUrl = getWorkerBaseUrl();
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/trigger-agent` : '/api/admin/trigger-agent';
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${adminPassword}` },
+    });
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {}
+    if (!response.ok || data?.success === false) {
+      return { success: false, message: data?.error || `Request failed (${response.status})` };
+    }
+    return data as any;
+  },
 };
