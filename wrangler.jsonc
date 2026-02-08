@@ -5,6 +5,17 @@
     "compatibility_flags": [
         "nodejs_compat"
     ],
+    "keep_vars": true,
+    "routes": [
+        {
+            "pattern": "examsite.in",
+            "custom_domain": true
+        },
+        {
+            "pattern": "www.examsite.in",
+            "custom_domain": true
+        }
+    ],
     "assets": {
         "directory": "./dist",
         "binding": "ASSETS"
