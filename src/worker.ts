@@ -49,6 +49,42 @@ interface JobPostRequest {
     applyLink: string;
 }
 
+let jobDetailsColumnCache: { checkedAt: number; flags: Record<string, boolean> } | null = null;
+
+async function getJobDetailsColumnFlags(env: Env): Promise<Record<string, boolean>> {
+    const now = Date.now();
+    if (jobDetailsColumnCache && now - jobDetailsColumnCache.checkedAt < 5 * 60 * 1000) {
+        return jobDetailsColumnCache.flags;
+    }
+    const info = await env.DB.prepare('PRAGMA table_info(job_details)').all();
+    const names = new Set((info.results || []).map((r: any) => String(r?.name || '')));
+    const flags: Record<string, boolean> = {
+        post_date: names.has('post_date'),
+        is_active: names.has('is_active'),
+        created_by: names.has('created_by'),
+        source_domain: names.has('source_domain'),
+        created_at: names.has('created_at'),
+        updated_at: names.has('updated_at')
+    };
+    jobDetailsColumnCache = { checkedAt: now, flags };
+    return flags;
+}
+
+function getAdminJobsSelectSql(flags: Record<string, boolean>): { select: string; orderBy: string } {
+    const select = [
+        'id',
+        'title',
+        flags.post_date ? 'post_date' : 'NULL as post_date',
+        flags.is_active ? 'is_active' : '1 as is_active',
+        flags.created_by ? 'created_by' : 'NULL as created_by',
+        flags.source_domain ? 'source_domain' : 'NULL as source_domain',
+        flags.updated_at ? 'updated_at' : (flags.created_at ? 'created_at as updated_at' : 'NULL as updated_at')
+    ].join(', ');
+
+    const orderBy = flags.updated_at ? 'updated_at' : (flags.created_at ? 'created_at' : 'rowid');
+    return { select, orderBy };
+}
+
 // ==================== SECURITY UTILITIES ====================
 
 // Secure token generator using crypto
@@ -1036,8 +1072,18 @@ export default {
             if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
                 return errorResponse('Unauthorized', 401, origin);
             }
-            const rows = await env.DB.prepare(`SELECT id, title, post_date FROM job_details WHERE is_active = 0 ORDER BY updated_at DESC`).all();
-            return jsonResponse({ success: true, pending: rows.results || [] }, 200, origin);
+            try {
+                const flags = await getJobDetailsColumnFlags(env);
+                const sql = getAdminJobsSelectSql(flags);
+                const whereClause = flags.is_active ? 'WHERE is_active = 0' : '';
+                const rows = await env.DB.prepare(
+                    `SELECT ${sql.select} FROM job_details ${whereClause} ORDER BY ${sql.orderBy} DESC LIMIT 200`
+                ).all();
+                return jsonResponse({ success: true, pending: rows.results || [] }, 200, origin);
+            } catch (error) {
+                console.error('Admin pending error:', error);
+                return errorResponse('Request failed (500)', 500, origin);
+            }
         }
 
         if (path === '/api/admin/jobs' && request.method === 'GET') {
@@ -1046,20 +1092,25 @@ export default {
             if (!authHeader || !authHeader.startsWith('Bearer ') || !secureCompare(authHeader.slice(7), env.ADMIN_PASSWORD)) {
                 return errorResponse('Unauthorized', 401, origin);
             }
-            const url = new URL(request.url);
-            const status = (url.searchParams.get('status') || 'all').toLowerCase();
-            let whereClause = '';
-            if (status === 'pending') whereClause = 'WHERE is_active = 0';
-            else if (status === 'active') whereClause = 'WHERE is_active = 1';
-            else if (status === 'inactive') whereClause = 'WHERE is_active != 1';
-            const rows = await env.DB.prepare(
-                `SELECT id, title, post_date, is_active, created_by, source_domain, updated_at
-                 FROM job_details
-                 ${whereClause}
-                 ORDER BY updated_at DESC
-                 LIMIT 200`
-            ).all();
-            return jsonResponse({ success: true, jobs: rows.results || [] }, 200, origin);
+            try {
+                const url = new URL(request.url);
+                const status = (url.searchParams.get('status') || 'all').toLowerCase();
+                const flags = await getJobDetailsColumnFlags(env);
+                const sql = getAdminJobsSelectSql(flags);
+                let whereClause = '';
+                if (flags.is_active) {
+                    if (status === 'pending') whereClause = 'WHERE is_active = 0';
+                    else if (status === 'active') whereClause = 'WHERE is_active = 1';
+                    else if (status === 'inactive') whereClause = 'WHERE is_active != 1';
+                }
+                const rows = await env.DB.prepare(
+                    `SELECT ${sql.select} FROM job_details ${whereClause} ORDER BY ${sql.orderBy} DESC LIMIT 200`
+                ).all();
+                return jsonResponse({ success: true, jobs: rows.results || [] }, 200, origin);
+            } catch (error) {
+                console.error('Admin jobs list error:', error);
+                return errorResponse('Request failed (500)', 500, origin);
+            }
         }
 
         if (path.startsWith('/api/admin/jobs/') && request.method === 'GET') {
