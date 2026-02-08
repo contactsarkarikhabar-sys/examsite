@@ -387,7 +387,8 @@ export const jobService = {
     adminPassword: string
   ): Promise<{ success: boolean; message: string }> => {
     const workerUrl = getWorkerBaseUrl();
-    const response = await fetch(`${workerUrl}/api/admin/jobs/${jobId}`, {
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs/${encodeURIComponent(jobId)}` : `/api/admin/jobs/${encodeURIComponent(jobId)}`;
+    const response = await fetch(apiUrl, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });

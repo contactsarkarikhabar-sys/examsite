@@ -151,19 +151,27 @@ const ALLOWED_ORIGINS = [
     'https://www.examsite.in',
     'http://localhost:5173', // Dev only
     'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
 ];
 
 function getCorsHeaders(origin: string | null): HeadersInit {
-    const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-    return {
-        'Access-Control-Allow-Origin': allowedOrigin,
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : null;
+    const headers: Record<string, string> = {
+        'Access-Control-Allow-Methods': 'GET, POST, DELETE, PUT, PATCH, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'X-XSS-Protection': '1; mode=block',
     };
+    if (allowedOrigin) {
+        headers['Access-Control-Allow-Origin'] = allowedOrigin;
+    } else if (!origin) {
+        headers['Access-Control-Allow-Origin'] = '*';
+    }
+    return headers;
 }
 
 function jsonResponse(data: object, status = 200, origin: string | null = null): Response {
