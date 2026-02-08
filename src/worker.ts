@@ -863,9 +863,14 @@ async function handleDeleteJob(request: Request, env: Env, jobId: string): Promi
     }
 
     try {
-        await env.DB.prepare('DELETE FROM job_details WHERE id = ?')
+        const result = await env.DB.prepare('DELETE FROM job_details WHERE id = ?')
             .bind(jobId)
             .run();
+
+        const changes = Number((result as any)?.meta?.changes ?? (result as any)?.meta?.rows_written ?? 0);
+        if (changes <= 0) {
+            return errorResponse('Job not found', 404, origin);
+        }
 
         return jsonResponse({ success: true, message: 'Job deleted successfully' }, 200, origin);
     } catch (error) {

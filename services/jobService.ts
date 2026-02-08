@@ -344,6 +344,7 @@ export const jobService = {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs?status=${encodeURIComponent(status)}` : `/api/admin/jobs?status=${encodeURIComponent(status)}`;
     const response = await fetch(apiUrl, {
+      cache: 'no-store',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });
     let data: any = null;
@@ -363,6 +364,7 @@ export const jobService = {
     const workerUrl = getWorkerBaseUrl();
     const apiUrl = workerUrl ? `${workerUrl}/api/admin/jobs/${encodeURIComponent(jobId)}` : `/api/admin/jobs/${encodeURIComponent(jobId)}`;
     const response = await fetch(apiUrl, {
+      cache: 'no-store',
       headers: { 'Authorization': `Bearer ${adminPassword}` },
     });
     let data: any = null;
