@@ -73,8 +73,10 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     }, [isAuthenticated, isOpen, activeTab]);
 
     const loadStats = async () => {
-        const data = await jobService.getSubscribersCount(password);
-        setStats({ total: data.total, verified: data.verified });
+        const data: any = await jobService.getSubscribersCount(password);
+        if (typeof data?.total === 'number' && data.total >= 0) {
+            setStats({ total: data.total, verified: data.verified });
+        }
     };
 
     const loadPending = async () => {
@@ -86,14 +88,21 @@ const AdminPanel: React.FC<Props> = ({ isOpen, onClose }) => {
         e.preventDefault();
         if (password.length > 0) {
             setIsLoading(true);
-            const data = await jobService.getSubscribersCount(password);
-            setIsLoading(false);
-
-            if (data.total >= 0) {
-                setIsAuthenticated(true);
-                setStats({ total: data.total, verified: data.verified });
-            } else {
-                setMessage({ type: 'error', text: 'Invalid password' });
+            setMessage(null);
+            try {
+                const data: any = await jobService.getSubscribersCount(password);
+                if (data.total >= 0) {
+                    setIsAuthenticated(true);
+                    setStats({ total: data.total, verified: data.verified });
+                } else if (data.total === -1) {
+                    setMessage({ type: 'error', text: data.error || 'Invalid password' });
+                } else {
+                    setMessage({ type: 'error', text: data.error || 'API error' });
+                }
+            } catch (e) {
+                setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) });
+            } finally {
+                setIsLoading(false);
             }
         }
     };

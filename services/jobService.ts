@@ -300,11 +300,19 @@ export const jobService = {
 
   getSubscribersCount: async (adminPassword: string) => {
     const workerUrl = getWorkerBaseUrl();
-    const response = await fetch(`${workerUrl}/api/admin/subscribers`, {
-      headers: { 'Authorization': `Bearer ${adminPassword}` },
-    });
-    const data = await response.json() as any;
-    return { total: data.totalSubscribers || 0, verified: data.verifiedSubscribers || 0 };
+    const apiUrl = workerUrl ? `${workerUrl}/api/admin/subscribers` : '/api/admin/subscribers';
+    try {
+      const response = await fetch(apiUrl, {
+        headers: { 'Authorization': `Bearer ${adminPassword}` },
+      });
+      const data = await response.json() as any;
+      if (!response.ok || data?.success === false) {
+        return { total: -1, verified: 0, error: data?.error || 'Unauthorized' };
+      }
+      return { total: data.totalSubscribers || 0, verified: data.verifiedSubscribers || 0 };
+    } catch (e) {
+      return { total: -2, verified: 0, error: e instanceof Error ? e.message : String(e) };
+    }
   },
 
   getAllDbJobs: async (adminPassword: string) => {

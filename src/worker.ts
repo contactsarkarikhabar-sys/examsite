@@ -90,7 +90,8 @@ function isValidEmail(email: string): boolean {
 }
 
 // Secure password comparison (timing-safe)
-function secureCompare(a: string, b: string): boolean {
+function secureCompare(a: unknown, b: unknown): boolean {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
     if (a.length !== b.length) return false;
     let result = 0;
     for (let i = 0; i < a.length; i++) {
@@ -413,6 +414,9 @@ async function handlePostJob(request: Request, env: Env): Promise<Response> {
 // Handler: Admin - Get subscribers count
 async function handleGetSubscribers(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
+    if (!env.ADMIN_PASSWORD) {
+        return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+    }
 
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -590,6 +594,9 @@ async function handleGetJob(request: Request, env: Env, jobId: string): Promise<
 // Handler: Create or Update job (admin only)
 async function handleSaveJob(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
+    if (!env.ADMIN_PASSWORD) {
+        return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+    }
 
     // Auth check
     const authHeader = request.headers.get('Authorization');
@@ -701,6 +708,9 @@ async function handleSaveJob(request: Request, env: Env): Promise<Response> {
 // Handler: Delete job (admin only)
 async function handleDeleteJob(request: Request, env: Env, jobId: string): Promise<Response> {
     const origin = request.headers.get('Origin');
+    if (!env.ADMIN_PASSWORD) {
+        return errorResponse('ADMIN_PASSWORD not configured', 500, origin);
+    }
 
     // Auth check
     const authHeader = request.headers.get('Authorization');
