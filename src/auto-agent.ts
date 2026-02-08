@@ -152,13 +152,67 @@ export class AutoAgent {
         }
     }
 
-    private async buildDeepContext(baseUrl: string, snippet: string): Promise<{ context: string; candidateLinks: string[] }> {
+    private tokenizeForMatch(text: string): string[] {
+        const raw = (text || '').toLowerCase().replace(/[^a-z0-9\s]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const stop = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'view', 'download', 'notification', 'recruitment', 'dated', 'date', 'start', 'end', 'application', 'apply', 'online', 'form']);
+        const tokens = raw.split(' ')
+            .map(t => t.trim())
+            .filter(t => t.length >= 4 && !stop.has(t));
+        return Array.from(new Set(tokens)).slice(0, 20);
+    }
+
+    private scoreMatch(haystack: string, tokens: string[]): number {
+        const h = (haystack || '').toLowerCase();
+        let score = 0;
+        for (const t of tokens) {
+            if (h.includes(t)) score += 1;
+        }
+        return score;
+    }
+
+    private extractDateHintsFromText(text: string): string[] {
+        const t = (text || '').replace(/\s+/g, ' ').trim();
+        const lower = t.toLowerCase();
+        const dateRe = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/g;
+        const dates = Array.from(new Set((t.match(dateRe) || []).map(d => d.trim()))).slice(0, 6);
+        if (dates.length === 0) return [];
+        if (lower.includes('start date') && lower.includes('end date') && dates.length >= 2) {
+            return [`Start Date: ${dates[0]}`, `End Date: ${dates[1]}`];
+        }
+        return dates.map(d => `Date: ${d}`);
+    }
+
+    private extractListingRowCandidates(html: string, baseUrl: string, title: string, snippet: string): Array<{ url: string; rowText: string; score: number; dateHints: string[] }> {
+        const tokens = this.tokenizeForMatch(`${title} ${snippet}`);
+        const rows = (html.match(/<tr[\s\S]*?<\/tr>/gi) || []).slice(0, 200);
+        const out: Array<{ url: string; rowText: string; score: number; dateHints: string[] }> = [];
+        for (const rowHtml of rows) {
+            const rowText = this.stripHtmlToText(rowHtml);
+            if (!rowText) continue;
+            const rowScore = this.scoreMatch(rowText, tokens);
+            if (rowScore <= 0) continue;
+            const urls = this.extractCandidateUrlsFromHtml(rowHtml, baseUrl);
+            if (urls.length === 0) continue;
+            const dateHints = this.extractDateHintsFromText(rowText);
+            const ranked = this.rankCandidateUrls(urls, baseUrl);
+            const chosen = ranked[0];
+            if (!chosen) continue;
+            let score = rowScore * 10;
+            if (/\.(pdf)(\?|$)/i.test(chosen)) score += 80;
+            if (/(view|download)/i.test(rowText)) score += 15;
+            if (dateHints.length) score += 10;
+            out.push({ url: chosen, rowText, score, dateHints });
+        }
+        return out.sort((a, b) => b.score - a.score).slice(0, 5);
+    }
+
+    private async buildDeepContext(baseUrl: string, title: string, snippet: string): Promise<{ context: string; candidateLinks: string[]; dateHints: string[] }> {
         const pieces: string[] = [];
         pieces.push(`Snippet: ${snippet}`);
 
         const primaryRes = await this.fetchWithTimeout(baseUrl, 12000);
         if (!primaryRes || !primaryRes.ok) {
-            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl] };
+            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl], dateHints: [] };
         }
 
         const primaryType = (primaryRes.headers.get('content-type') || '').toLowerCase();
@@ -166,27 +220,40 @@ export class AutoAgent {
             const buf = await primaryRes.arrayBuffer();
             const pdfText = this.extractTextFromPdf(buf);
             pieces.push(`PDF Content (Truncated): ${pdfText ? pdfText.slice(0, 12000) : ''}`);
-            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl] };
+            const dateHints = this.extractDateHintsFromText(pdfText);
+            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl], dateHints };
         }
 
         if (!primaryType.includes('text/html')) {
-            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl] };
+            return { context: pieces.join('\n\n'), candidateLinks: [baseUrl], dateHints: [] };
         }
 
         const html = await primaryRes.text();
         const primaryText = this.stripHtmlToText(html).slice(0, 12000);
         pieces.push(`Primary Page Text (Truncated): ${primaryText}`);
 
+        const rowCandidates = this.extractListingRowCandidates(html, baseUrl, title, snippet);
+        const rowBest = rowCandidates[0] || null;
+        if (rowBest) {
+            pieces.push(`Matched Listing Row (Truncated): ${rowBest.rowText.slice(0, 1200)}`);
+            if (rowBest.dateHints.length) pieces.push(`Listing Dates: ${rowBest.dateHints.join(' | ')}`);
+            pieces.push(`Listing View Link: ${rowBest.url}`);
+        }
+
         const candidates = this.rankCandidateUrls(this.extractCandidateUrlsFromHtml(html, baseUrl), baseUrl)
             .slice(0, 5);
 
-        const candidateLinks = Array.from(new Set([baseUrl, ...candidates])).slice(0, 6);
+        const candidateLinks = Array.from(new Set([baseUrl, ...(rowBest ? [rowBest.url] : []), ...candidates])).slice(0, 6);
         if (candidates.length) {
             pieces.push(`Candidate Official Links: ${candidates.slice(0, 3).join(' | ')}`);
         }
 
-        const deepUrls = candidates.slice(0, 2);
+        const deepUrls = Array.from(new Set([...(rowBest ? [rowBest.url] : []), ...candidates])).slice(0, 2);
         const deepParts: string[] = [];
+        const dateHints: string[] = [];
+        if (rowBest?.dateHints?.length) dateHints.push(...rowBest.dateHints);
+        const primaryDateHints = this.extractDateHintsFromText(primaryText);
+        if (primaryDateHints.length) dateHints.push(...primaryDateHints);
         for (const u of deepUrls) {
             const res = await this.fetchWithTimeout(u, 12000);
             if (!res || !res.ok) {
@@ -197,6 +264,8 @@ export class AutoAgent {
             if (ct.includes('application/pdf') || /\.(pdf)(\?|$)/i.test(u)) {
                 const buf = await res.arrayBuffer();
                 const pdfText = this.extractTextFromPdf(buf);
+                const pdfDateHints = this.extractDateHintsFromText(pdfText);
+                if (pdfDateHints.length) dateHints.push(...pdfDateHints);
                 if (pdfText) deepParts.push(`PDF Extract (${u}): ${pdfText.slice(0, 12000)}`);
                 else deepParts.push(`PDF Link: ${u}`);
                 continue;
@@ -204,6 +273,8 @@ export class AutoAgent {
             if (ct.includes('text/html')) {
                 const deepHtml = await res.text();
                 const deepText = this.stripHtmlToText(deepHtml).slice(0, 12000);
+                const deepDateHints = this.extractDateHintsFromText(deepText);
+                if (deepDateHints.length) dateHints.push(...deepDateHints);
                 deepParts.push(`Linked Page Text (${u}): ${deepText}`);
             } else {
                 deepParts.push(`Linked Source: ${u}`);
@@ -214,7 +285,11 @@ export class AutoAgent {
             pieces.push(`Deep Extraction:\n${deepParts.join('\n\n')}`.slice(0, 20000));
         }
 
-        return { context: pieces.join('\n\n').slice(0, 26000), candidateLinks };
+        const uniqueDateHints = Array.from(new Set(dateHints)).slice(0, 6);
+        if (uniqueDateHints.length) {
+            pieces.push(`Extracted Date Hints: ${uniqueDateHints.join(' | ')}`);
+        }
+        return { context: pieces.join('\n\n').slice(0, 26000), candidateLinks, dateHints: uniqueDateHints };
     }
 
     private isClaritySufficient(job: ParsedJob): boolean {
@@ -416,10 +491,12 @@ export class AutoAgent {
         // 2. Fetch Page Content + Deep Extraction (Truncated)
         let pageContext = `Snippet: ${result.snippet}`;
         let candidateLinks: string[] = [result.link];
+        let dateHints: string[] = [];
         try {
-            const built = await this.buildDeepContext(result.link, result.snippet);
+            const built = await this.buildDeepContext(result.link, result.title, result.snippet);
             pageContext = built.context;
             candidateLinks = built.candidateLinks;
+            dateHints = built.dateHints || [];
         } catch (err) {
             console.warn(`Failed to fetch ${result.link}, using snippet only.`);
         }
@@ -492,9 +569,18 @@ export class AutoAgent {
                     url: sanitizeUrl(String(l.url || '')) || sanitizeUrl(result.link)
                 }))
                 : [{ label: "Apply Link", url: sanitizeUrl(result.link) }];
-            const importantDatesArr = Array.isArray(parsed.importantDates)
+            let importantDatesArr = Array.isArray(parsed.importantDates)
                 ? parsed.importantDates.map((d: any) => String(d))
                 : ["Check Notification"];
+            if (dateHints.length) {
+                const isGeneric = importantDatesArr.length === 0 || importantDatesArr.some(d => /check notification|see notification/i.test(String(d)));
+                if (isGeneric) {
+                    importantDatesArr = dateHints;
+                } else {
+                    const merged = Array.from(new Set([...importantDatesArr, ...dateHints])).slice(0, 8);
+                    importantDatesArr = merged;
+                }
+            }
             const derivedTitle = deriveReadableTitle({
                 title: String(parsed.title || result.title || ''),
                 shortInfo: String(parsed.shortInfo || result.snippet || ''),
