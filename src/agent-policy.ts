@@ -100,6 +100,8 @@ export const isAllowedSourceUrl = (link: string, title: string, snippet: string)
     const url = new URL(link);
     const host = url.hostname.toLowerCase();
     const path = url.pathname.toLowerCase();
+    const urlText = `${host}${path}${url.search}`.toLowerCase();
+    const hasKeywordAnywhere = hasKeyword || keywords.some(k => urlText.includes(k.replace(/\s+/g, '')));
     const knownBoards = [
       'ssc.gov.in',
       'upsc.gov.in',
@@ -124,7 +126,8 @@ export const isAllowedSourceUrl = (link: string, title: string, snippet: string)
     const isGov = host.endsWith('.gov.in') || host.endsWith('.nic.in');
     const recruitmentPath = /(recruit|career|vacanc|notification|advertis|employment|jobs?)/i.test(path);
     if (isGov && hasKeyword && recruitmentPath) return true;
-
+    if (isGov && recruitmentPath) return true;
+    if (isGov && hasKeywordAnywhere) return true;
     return false;
   } catch {
     return false;

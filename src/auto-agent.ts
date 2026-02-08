@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { deriveReadableTitle, isActionOnlyTitle, isGenericHeadTitle, isTrustedDomain as isTrustedDomainShared, stripGenericHeadPrefix } from '../shared/jobTitle';
+import { isAllowedSourceUrl } from './agent-policy';
 
 interface Env {
     DB: D1Database;
@@ -32,45 +33,6 @@ export class AutoAgent {
 
     constructor(env: Env) {
         this.env = env;
-    }
-
-    private isAllowedSourceUrl(link: string, title: string, snippet: string): boolean {
-        const text = `${title || ''} ${snippet || ''}`.toLowerCase();
-        const keywords = ['ssc', 'upsc', 'railway', 'rrb', 'ntpc', 'alp', 'group d', 'ibps', 'sbi', 'rbi', 'lic', 'afcat', 'agniveer',
-            'uppsc', 'upsssc', 'rpsc', 'rsmssb', 'bpsc', 'mppsc', 'wbpsc', 'dsssb', 'psssb', 'uksssc', 'cgpsc', 'mpesb', 'csbc'
-        ];
-        const hasKeyword = keywords.some(k => text.includes(k));
-        try {
-            const url = new URL(link);
-            const host = url.hostname.toLowerCase();
-            const path = url.pathname.toLowerCase();
-            const knownBoards = [
-                'ssc.gov.in',
-                'upsc.gov.in',
-                'indianrailways.gov.in',
-                'ibps.in',
-                'sbi.co.in',
-                'opportunities.rbi.org.in',
-                'rbi.org.in',
-                'licindia.in',
-                'afcat.cdac.in',
-                'agnipathvayu.cdac.in',
-                'joinindianarmy.nic.in',
-                'joinindiannavy.gov.in',
-                'csbc.bih.nic.in',
-                'uppbpb.gov.in',
-                'upsssc.gov.in',
-                'uppsc.up.nic.in'
-            ];
-            const isKnownBoard = knownBoards.some(d => host === d || host.endsWith(`.${d}`));
-            if (isKnownBoard) return true;
-            const isGov = host.endsWith('.gov.in') || host.endsWith('.nic.in');
-            const recruitmentPath = /(recruit|career|vacanc|notification|advertis|employment|jobs?)/i.test(path);
-            if (isGov && hasKeyword && recruitmentPath) return true;
-            return false;
-        } catch {
-            return false;
-        }
     }
 
     private isClaritySufficient(job: ParsedJob): boolean {
@@ -142,7 +104,7 @@ export class AutoAgent {
             for (const result of uniqueResults) {
                 console.log(`Analyzing: ${result.title}`);
                 try {
-                    if (!this.isAllowedSourceUrl(result.link, result.title, result.snippet)) {
+                    if (!isAllowedSourceUrl(result.link, result.title, result.snippet)) {
                         skippedReasons.push(`Blocked source: ${result.title.substring(0, 40)}... from ${result.link}`);
                         continue;
                     }
